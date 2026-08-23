@@ -52,8 +52,7 @@
 
 <!-- ══════════ الهيرو ══════════ -->
 <section class="hero" id="hero">
-  <div class="hero-bg" aria-hidden="true"></div>
-  <div class="hero-scrim" aria-hidden="true"></div>
+  <div class="hero-aura" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
 
   <div class="hero-in">
     <div class="hero-copy">
@@ -105,10 +104,71 @@
         </li>
       </ul>
     </div>
-  </div>
 
-  <!-- على الجوال يظهر العمل الفني تحت النص بدل أن يُقصّ خلفه -->
-  <img class="hero-shot" src="/assets/img/hero-bg-sm.jpg" alt="" aria-hidden="true" loading="lazy" decoding="async">
+    <!--
+      المشهد: جهازان يعرضان متجرين **حقيقيين** من ‎/api/showcase‎ بلوحتيهما
+      اللونيتين — لا صورة ثابتة. كله زخرفي (aria-hidden) لأن الأسعار
+      والمنتجات هنا عيّنة، والقيمة مكتوبة في النص المجاور.
+    -->
+    <div class="hero-scene" aria-hidden="true">
+      <div class="scene-fit">
+        <span class="scene-glow"></span>
+        <img class="scene-mark" src="/assets/img/logo.png" alt="" width="380" height="247">
+
+        <div class="laptop" id="devLaptop">
+          <div class="lid"><div class="screen">
+            <div class="mini">
+              <div class="m-bar">
+                <span class="m-av" id="lapAv">ي</span>
+                <b id="lapName">متجر ذو يزن للعطور</b>
+                <span class="m-vf"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 6 9 17l-5-5"/></svg></span>
+                <span class="m-cart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 2H2"/></svg><i>٣</i></span>
+              </div>
+              <div class="m-chips"><i class="on"></i><i></i><i></i><i></i></div>
+              <div class="m-grid">
+            <div class="m-card">
+              <span class="m-shot s1"></span>
+              <em></em><b></b>
+            </div>
+            <div class="m-card">
+              <span class="m-shot s2"></span>
+              <em></em><b></b>
+            </div>
+            <div class="m-card">
+              <span class="m-shot s3"></span>
+              <em></em><b></b>
+            </div>
+              </div>
+            </div>
+          </div></div>
+          <div class="base"><span></span></div>
+        </div>
+
+        <div class="phone" id="devPhone">
+          <div class="screen">
+            <i class="notch"></i>
+            <div class="mini mini-sm">
+              <div class="m-bar">
+                <span class="m-av" id="phAv">أ</span>
+                <b id="phName">أطلس للإلكترونيات</b>
+              </div>
+              <span class="m-shot s4"></span>
+              <div class="m-line"></div>
+              <div class="m-line short"></div>
+              <div class="m-price"><b></b></div>
+              <div class="m-btn">أضف للسلة</div>
+            </div>
+          </div>
+          <i class="bar"></i>
+        </div>
+
+        <span class="gi g-cart"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 2H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg></span>
+        <span class="gi g-chart"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V11M9 19V5M14 19v-6M19 19V8"/></svg></span>
+        <span class="gi g-shield"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <span class="bag"><i class="handle"></i><img src="/assets/img/logo.png" alt="" width="34" height="22"></span>
+      </div>
+    </div>
+  </div>
 
   <div class="hero-strip">
     <div class="wrap">

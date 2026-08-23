@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 //  الموقع التسويقي (§٣.١) — الهدف الوحيد: تحويل الزائر لمسجّل
 // ═══════════════════════════════════════════════════════════
-import { $, $$, api, AR, escapeHtml } from './app.js';
+import { $, $$, api, AR, escapeHtml, scopeTheme } from './app.js';
 
 // ── الهيدر اللاصق ────────────────────────────────────────
 const hdr = $('#hdr');
@@ -189,6 +189,12 @@ if (mtrack) {
       $('#signName').textContent = first.name;
       $('#signSlug').textContent = first.slug;
     }
+
+    // المشهد في الهيرو: الجهازان يعرضان **متجرين مختلفين**،
+    // ولكلٍّ لوحته اللونية كاملة. هذا برهان بصري على أن اللون
+    // يصبغ المتجر كله — يراه الزائر قبل أن يقرأ الجملة.
+    dressDevice($('#devLaptop'), first, '#lapAv', '#lapName');
+    dressDevice($('#devPhone'), stores.find((s) => s !== first) ?? first, '#phAv', '#phName');
   }).catch(() => { mtrack.closest('.marq').hidden = true; });
 }
 
@@ -210,4 +216,35 @@ if (prow) {
       </div>`).join('');
     $$('.pcard').forEach((el) => io.observe(el));
   }).catch(() => {});
+}
+
+/** يكسو جهازاً في مشهد الهيرو بمتجر حقيقي: اسمه وشعاره ولوحته */
+function dressDevice(device, store, avSel, nameSel) {
+  if (!device || !store) return;
+  scopeTheme(device, store);                       // اللوحة كاملة على الجهاز
+
+  const name = $(nameSel);
+  if (name) name.textContent = store.name;
+
+  const av = $(avSel);
+  if (av) {
+    av.innerHTML = store.logo
+      ? `<img src="${escapeHtml(store.logo)}" alt="">`
+      : escapeHtml(store.name.replace(/^(متجر|محل)s+/, '').charAt(0));
+  }
+}
+
+// ── منظار المؤشر على المشهد ──────────────────────────────
+//  يميل المشهد قليلاً مع المؤشر فيبدو مجسّماً. نفس شرط
+//  اللوحة المعلّقة: مؤشر حقيقي، شاشة واسعة، وحركة مسموحة.
+const fit = $('.scene-fit');
+if (fit && matchMedia('(hover:hover)').matches
+        && matchMedia('(min-width:900px)').matches
+        && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  const base = getComputedStyle(fit).transform;
+  addEventListener('mousemove', (e) => {
+    const x = (e.clientX / innerWidth - .5) * 16;
+    const y = (e.clientY / innerHeight - .5) * 10;
+    fit.style.translate = `${x}px ${y}px`;
+  }, { passive: true });
 }
