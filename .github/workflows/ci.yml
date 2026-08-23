@@ -1,0 +1,108 @@
+# ═══════════════════════════════════════════════════════════
+#  التكامل المستمر
+#  لا خطوة تثبيت: المشروع بلا اعتماديات خارجية.
+# ═══════════════════════════════════════════════════════════
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      # أسرار وهمية: الاختبارات تحتاج قيماً موجودة لا صحيحة.
+      # المفاتيح الحقيقية لا تدخل CI أبداً.
+      NODE_ENV: development
+      OTP_PROVIDER: console
+      OTP_PEPPER: ci-pepper-not-a-real-secret
+      VISIT_SALT: ci-salt-not-a-real-secret
+      META_APP_SECRET: ci000000000000000000000000000000
+      WA_VERIFY_TOKEN: ci_verify_token
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: التحقق من العزل بين المتاجر
+        run: node --no-warnings -e "import('./src/tenancy.js').then(m => m.verifyIsolation())"
+
+      - name: تدقيق الجاهزية
+        run: npm run readiness
+
+      - name: تجهيز قاعدة بيانات نظيفة
+        run: npm run reset
+
+      - name: تشغيل الخادم
+        run: |
+          node --no-warnings src/server.js &
+          echo $! > server.pid
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/health && break
+            sleep 1
+          done
+
+      - name: الاختبارات
+        run: |
+          node --no-warnings test/smoke.mjs
+          node --no-warnings test/images.mjs
+          node --no-warnings test/gallery.mjs
+          node --no-warnings test/billing.mjs
+          node --no-warnings test/stores.mjs
+          node --no-warnings test/pages.mjs
+          node --no-warnings test/webhook.mjs
+          node --no-warnings test/infra.mjs
+
+      - name: الإيقاف الرشيد يعمل
+        run: |
+          kill -TERM "$(cat server.pid)"
+          sleep 3
+          if kill -0 "$(cat server.pid)" 2>/dev/null; then
+            echo "✖ العملية لم تتوقّف خلال المهلة"; exit 1
+          fi
+          echo "✓ توقّف بسلام"
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # حارس أخير: مفتاح واتساب مكشوف يعني استنزاف رصيد
+      # الرسائل خلال ساعات. أرخص فحص في المشروع وأعلاه عائداً.
+      - name: لا أسرار في المصدر
+        run: |
+          if grep -rEn 'EAA[A-Za-z0-9]{30}' --include='*.js' --include='*.mjs' --include='*.json' --include='*.md' . ; then
+            echo "✖ رمز وصول Meta مكتوب في المستودع"; exit 1
+          fi
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "✖ ملف .env متتبَّع في Git"; exit 1
+          fi
+          echo "✓ لا أسرار متتبَّعة"
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: بناء الصورة
+        run: docker build -t rvios-store:ci .
+      - name: الصورة تُقلع وتردّ على فحص الحياة
+        run: |
+          docker run -d --name rv -p 3000:3000 \
+            -e RVIOS_ADMIN_PASS=ci-not-the-default \
+            -e OTP_PEPPER=ci-pepper \
+            -e VISIT_SALT=ci-salt \
+            rvios-store:ci
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/health && break
+            sleep 1
+          done
+          curl -sf http://localhost:3000/health | grep -q '"ok":true'
+          docker rm -f rv

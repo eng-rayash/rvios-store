@@ -1,0 +1,19 @@
+# الأسرار — لا تُرفع أبداً
+# مفتاح API مكشوف يعني استنزاف رصيد رسائلك خلال دقائق (§٦.٧)
+.env
+.env.*
+!.env.example
+
+# قاعدة البيانات والصور المرفوعة
+data/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# نظام التشغيل والمحررات
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/

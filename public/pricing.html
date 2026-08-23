@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/assets/img/logo.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#9E2226">
+<link rel="apple-touch-icon" href="/assets/img/logo.png">
+<title>الباقات — RVIOS Store</title>
+<meta name="description" content="ابدأ مجاناً حتى ١٥ منتجاً. باقتا بلس وبرو لمن يحتاج مساحة أكبر — بلا أي عمولة على المبيعات.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/site.css">
+<noscript><style>.rv{opacity:1 !important;transform:none !important}</style></noscript>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true"><div class="glow g1"></div><div class="glow g2"></div></div>
+
+<header class="site-hdr" id="hdr">
+  <div class="wrap">
+    <a href="/" class="brand">
+      <img src="/assets/img/logo.png" alt="RVIOS" class="mark">
+      <span class="word"><b>RVIOS</b><i>S T O R E</i></span>
+    </a>
+    <nav class="site-nav">
+      <a href="/#steps">كيف يعمل</a>
+      <a href="/sectors">القطاعات</a>
+      <a href="/pricing" class="on">الباقات</a>
+      <a href="/about">عن المنصة</a>
+    </nav>
+    <div class="hactions">
+      <a href="/login" class="ghost">تسجيل الدخول</a>
+      <a href="/onboarding" class="solid"><span>ابدأ مجاناً</span></a>
+    </div>
+    <button class="burger" id="burger" aria-label="القائمة"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<section class="pricing" style="padding-top:60px">
+  <div class="wrap">
+    <div class="head" style="max-width:640px">
+      <div class="kick">الباقات</div>
+      <h2>ابدأ مجاناً، وانتقل متى احتجت مساحة أكبر</h2>
+      <p>
+        الحد المجاني اختير ليكون كافياً لتجربة الفكرة. حين يتجاوزه متجرك،
+        تكون الترقية حاجة نابعة من نجاحك — لا ضغطاً تسويقياً.
+      </p>
+    </div>
+
+    <div class="prow" id="prow"></div>
+    <p class="pnote">لا نأخذ أي عمولة على مبيعاتك — الاشتراك فقط.</p>
+
+    <!-- جدول المقارنة الكامل -->
+    <div class="head" style="margin:80px 0 0"><div class="kick">مقارنة كاملة</div><h2>ما الذي تحصل عليه في كل باقة</h2></div>
+    <div style="overflow-x:auto;margin-top:32px">
+      <table class="card" style="width:100%;border-collapse:collapse;overflow:hidden" id="cmp"></table>
+    </div>
+
+    <!-- الخدمات الإضافية — منفصلة بوضوح (§٢.١) -->
+    <div class="head" style="margin:80px 0 0">
+      <div class="kick">خدمات إضافية</div>
+      <h2>خدمات تُطلب مرة واحدة، منفصلة عن الاشتراك</h2>
+      <p>هذه ليست جزءاً من أي باقة — تطلبها متى احتجتها، وتُحاسب عليها وحدها.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:32px" id="addons"></div>
+
+    <!-- أسئلة شائعة -->
+    <div class="head" style="margin:80px 0 0"><div class="kick">أسئلة شائعة</div><h2>ما يسأل عنه التجار غالباً</h2></div>
+    <div style="margin-top:28px;max-width:760px" id="faq"></div>
+  </div>
+</section>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="fbot" style="border:none;padding:0">
+      <span>© ٢٠٢٦ RVIOS Store. جميع الحقوق محفوظة.</span>
+      <span><a href="/legal#terms">الشروط</a> · <a href="/legal#privacy">الخصوصية</a> · <a href="/contact">تواصل معنا</a></span>
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="/assets/js/page-pricing.js"></script>
+<script src="/assets/js/pwa.js" defer></script>
+</body>
+</html>

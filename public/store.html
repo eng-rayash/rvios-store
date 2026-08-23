@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-tier="clean" data-skin="signature">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/assets/img/logo.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#9E2226">
+<link rel="apple-touch-icon" href="/assets/img/logo.png">
+<title>جارٍ التحميل… | RVIOS Store</title>
+<meta name="description" content="متجر إلكتروني على منصة RVIOS Store">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/store.css">
+<link rel="stylesheet" href="/assets/css/store-tiers.css">
+</head>
+<body>
+
+<!-- خلفية محيطة — تظهر في الطبقة الفاخرة وحدها (برو) -->
+<div class="ambient" aria-hidden="true">
+  <span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span>
+  <span class="grain"></span>
+</div>
+
+<a href="#grid" class="skip">تخطَّ إلى المنتجات</a>
+
+<div class="plat" id="plat"><div class="wrap">
+  <span class="m">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+    متجر على منصة RVIOS Store
+  </span>
+  <a href="/onboarding">أنشئ متجرك مجاناً ←</a>
+</div></div>
+
+<header class="hdr" id="hdr"><div class="wrap">
+  <a href="./" class="logo">
+    <span class="lm" id="logo">؟</span>
+    <span>
+      <b id="shopName">…</b>
+      <span class="vf" id="verified" hidden>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>موثّق
+      </span>
+    </span>
+  </a>
+  <nav class="hnav">
+    <a href="#grid" class="on" data-cat="all">كل المنتجات</a>
+    <a href="#offers" data-filter="sale">العروض</a>
+    <a href="#about" id="navAbout">عن المتجر</a>
+  </nav>
+  <div class="hicons">
+    <button class="ib" id="openCart" aria-label="السلة">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 2H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>
+      <b id="badge" hidden>0</b>
+    </button>
+    <button class="ib" id="share" aria-label="مشاركة المتجر">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+    </button>
+  </div>
+</div></header>
+
+<section class="hero" id="hero">
+  <div class="bg" id="heroBg" hidden><img id="heroImg" alt=""></div>
+  <div class="wash" aria-hidden="true"></div>
+  <div class="in wrap">
+    <span class="eyebrow" id="heroKicker" hidden></span>
+    <h1 id="heroTitle">…</h1>
+    <p id="heroTag"></p>
+    <div class="meta" id="heroMeta"></div>
+    <div class="hcta" id="heroCta" hidden>
+      <a class="btn btn-shop" href="#grid">تصفّح المنتجات</a>
+      <a class="btn btn-ghost" id="heroWa" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5A8.5 8.5 0 1 1 21 11.5Z"/></svg>
+        اسأل عبر واتساب
+      </a>
+    </div>
+  </div>
+</section>
+
+<div class="trust" id="trust" hidden><div class="wrap" id="trustIn"></div></div>
+
+<div class="searchbar" id="searchbar"><div class="wrap">
+  <div class="sfield">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="search" id="q" placeholder="ابحث في المتجر…" aria-label="بحث في المنتجات">
+  </div>
+  <button class="btn btn-line fbtn" id="fToggle">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
+    الفلاتر
+  </button>
+</div></div>
+
+<!-- شريط تصنيفات أفقي — أسرع طريق للتصفح على الجوال -->
+<div class="rail" id="rail" hidden><div class="wrap"><div class="rail-in" id="railIn"></div></div></div>
+
+<div class="wrap layout">
+  <aside class="filters" id="filters" aria-label="فلاتر المنتجات">
+    <div class="fgroup">
+      <h3>التصنيفات</h3>
+      <div id="cats"></div>
+    </div>
+    <div class="fgroup">
+      <h3>السعر</h3>
+      <div id="prices"></div>
+    </div>
+    <div class="fgroup">
+      <h3>خيارات</h3>
+      <label class="chk"><input type="checkbox" id="inStock">المتوفر فقط</label>
+      <label class="chk"><input type="checkbox" id="onSale">عليه خصم</label>
+    </div>
+  </aside>
+
+  <main>
+    <div class="tools">
+      <span class="res" id="res"></span>
+      <label class="sr" for="sort">ترتيب</label>
+      <select id="sort">
+        <option value="new">الأحدث</option>
+        <option value="low">الأقل سعراً</option>
+        <option value="high">الأعلى سعراً</option>
+        <option value="name">الاسم</option>
+      </select>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+</div>
+
+<!-- قصة المتجر — صورة العرض (غير الغلاف) مع نبذة التاجر -->
+<section class="story" id="about" hidden>
+  <div class="wrap story-in">
+    <figure class="story-shot">
+      <img id="storyImg" alt="" loading="lazy">
+      <figcaption class="story-tag" id="storyTag" hidden></figcaption>
+    </figure>
+    <div class="story-txt">
+      <span class="eyebrow">قصة المتجر</span>
+      <h2 id="storyTitle">من نحن</h2>
+      <p id="storyText"></p>
+      <ul class="story-pts" id="storyPts"></ul>
+      <a class="btn btn-shop" id="storyWa" target="_blank" rel="noopener">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5A8.5 8.5 0 1 1 21 11.5Z"/></svg>
+        تحدّث معنا
+      </a>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="wabox" id="contact">
+    <b>تواصل مباشر مع المتجر</b>
+    <p id="hours"></p>
+    <a class="btn btn-wa" id="waDirect" target="_blank" rel="noopener">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5A8.5 8.5 0 1 1 21 11.5Z"/></svg>
+      محادثة واتساب
+    </a>
+  </div>
+</div>
+
+<footer class="foot"><div class="wrap">
+  <div class="ftop">
+    <div>
+      <h4 id="fName">…</h4>
+      <p id="fAbout"></p>
+      <div class="socs">
+        <a href="#" aria-label="واتساب" id="fWa" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5A8.5 8.5 0 1 1 21 11.5Z"/></svg></a>
+      </div>
+    </div>
+    <div><h4>التسوق</h4><ul id="fCats"></ul></div>
+    <div><h4>التواصل</h4><ul id="fContact"></ul></div>
+    <div>
+      <h4>المتجر</h4>
+      <ul>
+        <li id="fSince"></li>
+        <li><a href="#" id="fTrack">تتبّع طلبك</a></li>
+        <li><a href="/onboarding">أنشئ متجرك أنت</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="fbot">
+    <span class="pw">
+      <img src="/assets/img/logo.png" alt="RVIOS" width="17" height="17">
+      مدعوم بواسطة <b>RVIOS Store</b>
+    </span>
+    <button class="rep" id="reportBtn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v5M12 17.5v.5"/><path d="M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      إبلاغ عن هذا المتجر
+    </button>
+  </div>
+</div></footer>
+
+<div class="veil" id="veil"></div>
+
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="سلة التسوق">
+  <div class="dh">
+    <h2>سلة التسوق</h2>
+    <button class="x" id="closeCart" aria-label="إغلاق السلة"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="db" id="db"></div>
+  <div class="df" id="df" hidden>
+    <div class="tr"><span>المجموع الفرعي</span><span id="sub"></span></div>
+    <div class="tr t"><span>الإجمالي</span><b id="tot"></b></div>
+    <div class="note">
+      يُسجَّل طلبك في المتجر برقم مرجعي، ثم تُفتح محادثة واتساب لتأكيده مع التاجر
+      والاتفاق على التوصيل والدفع.
+    </div>
+    <label class="field">
+      <span>اسمك <small style="font-weight:400;color:var(--soft)">(اختياري)</small></span>
+      <input type="text" id="cName" placeholder="لمن نسجّل الطلب؟">
+    </label>
+    <label class="field">
+      <span>عنوان التوصيل <small style="font-weight:400;color:var(--soft)">(اختياري)</small></span>
+      <input type="text" id="cAddress" placeholder="الحي والشارع وأقرب معلم">
+    </label>
+    <label class="field">
+      <span>ملاحظة للتاجر <small style="font-weight:400;color:var(--soft)">(اختياري)</small></span>
+      <input type="text" id="cNote" placeholder="وقت التوصيل المفضّل…">
+    </label>
+    <button class="btn btn-wa btn-block" id="waBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5A8.5 8.5 0 1 1 21 11.5Z"/></svg>
+      تأكيد الطلب عبر واتساب
+    </button>
+  </div>
+</aside>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <button class="x" id="closeModal" aria-label="إغلاق"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <div class="mg" id="mg"></div>
+</div>
+
+<script type="module" src="/assets/js/store-page.js"></script>
+<script src="/assets/js/pwa.js" defer></script>
+</body>
+</html>

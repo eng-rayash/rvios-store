@@ -1,0 +1,47 @@
+{
+  "name": "RVIOS Store — متجرك الإلكتروني",
+  "short_name": "RVIOS",
+  "description": "أنشئ متجرك الإلكتروني وشارك رابطه في واتساب.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF3E8",
+  "theme_color": "#9E2226",
+  "categories": ["business", "shopping"],
+  "icons": [
+    {
+      "src": "/assets/img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "الطلبات",
+      "short_name": "الطلبات",
+      "description": "الطلبات المنتظرة للتأكيد",
+      "url": "/dashboard#orders"
+    },
+    {
+      "name": "أضف منتجاً",
+      "short_name": "منتج جديد",
+      "url": "/dashboard#products"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "rvios-store",
+  "version": "1.0.0",
+  "description": "منصة متاجر إلكترونية متعددة المستأجرين — RVIOS Store",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node --no-warnings src/server.js",
+    "dev": "node --no-warnings --watch src/server.js",
+    "seed": "node --no-warnings src/seed.js",
+    "reset": "node --no-warnings src/seed.js --reset",
+    "readiness": "node --no-warnings test/readiness.mjs",
+    "check:wa": "node --no-warnings ops/check-whatsapp.mjs",
+    "backup": "node --no-warnings ops/backup.mjs",
+    "backup:list": "node --no-warnings ops/restore.mjs --list",
+    "restore": "node --no-warnings ops/restore.mjs",
+    "test": "npm run reset && node --no-warnings test/smoke.mjs && node --no-warnings test/images.mjs && node --no-warnings test/gallery.mjs && node --no-warnings test/billing.mjs && node --no-warnings test/stores.mjs && node --no-warnings test/pages.mjs && node --no-warnings test/webhook.mjs && node --no-warnings test/infra.mjs && node --no-warnings test/reminders.mjs && node --no-warnings test/pwa.mjs && node --no-warnings test/pagination.mjs"
+  }
+}

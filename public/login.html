@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/assets/img/logo.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#9E2226">
+<link rel="apple-touch-icon" href="/assets/img/logo.png">
+<title>تسجيل الدخول — RVIOS Store</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/flow.css">
+<style>
+  .flow{grid-template-columns:1fr}
+  .pane{align-items:center}
+  .stage{margin:auto}
+</style>
+</head>
+<body>
+
+<div class="flow"><div class="pane">
+  <a href="/" class="brand">
+    <img src="/assets/img/logo.png" alt="RVIOS">
+    <span><b>RVIOS</b><i>S T O R E</i></span>
+  </a>
+
+  <div class="stage">
+    <section class="step on" id="s1">
+      <h1>تسجيل الدخول</h1>
+      <p>أدخل رقم جوالك المسجّل، ونرسل لك رمز تحقق.</p>
+      <label class="field">
+        <span>رقم الجوال</span>
+        <div class="slugbox">
+          <span class="pre">+967</span>
+          <input type="tel" id="phone" inputmode="numeric" placeholder="٧٧٧ ١٢٣ ٤٥٦" autocomplete="tel">
+        </div>
+        <div class="err" id="phoneErr" hidden></div>
+      </label>
+      <div class="acts">
+        <button class="btn btn-fill" id="sendCode">أرسل رمز التحقق</button>
+        <a href="/onboarding" class="skip">ليس لدي متجر بعد</a>
+      </div>
+    </section>
+
+    <section class="step" id="s2">
+      <h1>أدخل رمز التحقق</h1>
+      <p>أرسلنا رمزاً إلى <b id="phoneEcho" style="direction:ltr;display:inline-block"></b>.</p>
+      <div class="otp" id="otp">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="الرقم ١">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="الرقم ٢">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="الرقم ٣">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="الرقم ٤">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="الرقم ٥">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="الرقم ٦">
+      </div>
+      <div class="err" id="otpErr" hidden></div>
+      <div id="devHint" class="hint-ok" hidden></div>
+      <div class="acts">
+        <button class="btn btn-fill" id="verify">دخول</button>
+        <button class="skip" id="back">تغيير الرقم</button>
+      </div>
+    </section>
+  </div>
+</div></div>
+
+<script type="module" src="/assets/js/page-login.js"></script>
+<script src="/assets/js/pwa.js" defer></script>
+</body>
+</html>

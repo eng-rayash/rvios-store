@@ -1,0 +1,137 @@
+/* ═══════════════════════════════════════════════════════════
+   نظام التصميم — §٧.١
+   مصدر الحقيقة الوحيد للألوان والخطوط والعناصر المشتركة.
+   لون التاجر --shop متغيّر واحد يُحقن من إعداداته (§٣.٦)،
+   ولا يعرف أي جزء آخر من الكود لون أي متجر.
+   ═══════════════════════════════════════════════════════════ */
+
+:root{
+  /* الهوية */
+  --cream:#FAF3E8;  --paper:#FFFCF6;  --sand:#EFE3CC;  --line:#DFD1B5;
+  --brass:#C8A45D;  --brass-deep:#93712F;
+  --ink:#241F1B;    --soft:#6B6259;
+  --ok:#2E8B57;     --warn:#E8A020;   --danger:#D62828;
+
+  /* لون المتجر — يُحقن وقت التشغيل */
+  --shop:#9E2226;   --shop-deep:#6E1519;   --shop-lift:#C4494D;
+  --shop-rgb:158,34,38;
+  --on-shop:#fff;   --on-shop-deep:#fff;
+  --shop-text:#9E2226;   /* اللون حين يكون نصاً — يُضمن تباينه */
+
+  /* أسطح مشتقة من لون المتجر (theme-core.js) — القيم هنا
+     مجرد سقوط آمن قبل أن يحقن الخادم أو JS لوحة التاجر */
+  --shop-veil:#F7EFE4;  --shop-edge:#E3D2B8;
+  --glow:rgba(158,34,38,.16);  --glow-soft:rgba(158,34,38,.07);
+
+  --display:'Markazi Text',serif;
+  --body:'Tajawal',sans-serif;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --spring:cubic-bezier(.34,1.56,.64,1);
+
+  --r:6px; --r-lg:10px; --r-xl:18px;
+  --shadow:0 1px 2px rgba(36,31,27,.05), 0 8px 24px -12px rgba(36,31,27,.18);
+  --shadow-lift:0 26px 60px -26px rgba(36,31,27,.42), 0 2px 6px rgba(36,31,27,.06);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--cream);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+ul{list-style:none}
+svg{display:block;flex-shrink:0}
+img{max-width:100%}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
+:focus-visible{outline:2px solid var(--shop);outline-offset:2px;border-radius:2px}
+[hidden]{display:none !important}
+
+/* كل ما يلمسه المستخدم يأخذ لون المتجر — التحديد وشريط
+   التمرير ومؤشر النص، لا الأزرار وحدها (§٣.٦) */
+::selection{background:var(--shop);color:var(--on-shop)}
+input,textarea{caret-color:var(--shop)}
+*{scrollbar-color:var(--shop-edge) transparent;scrollbar-width:thin}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--shop-edge);border-radius:20px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--shop);background-clip:content-box}
+
+/* ── أزرار ────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:13.5px;font-weight:700;
+  padding:10px 17px;border-radius:4px;transition:transform .22s var(--ease),background .22s,color .22s,border-color .22s}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-fill{background:var(--shop);color:var(--on-shop)} .btn-fill:hover:not(:disabled){background:var(--shop-deep);color:var(--on-shop-deep)}
+/* زر «الهوية» — تدرّج من لون التاجر، يُستخدم في واجهة المتجر */
+.btn-shop{background:linear-gradient(135deg,var(--shop),var(--shop-deep));color:var(--on-shop);
+  box-shadow:0 10px 24px -12px var(--glow)}
+.btn-shop:hover:not(:disabled){box-shadow:0 16px 34px -14px var(--glow)}
+.btn-dark{background:var(--ink);color:var(--cream)} .btn-dark:hover:not(:disabled){background:#000}
+.btn-line{border:1.5px solid var(--line);background:var(--paper)} .btn-line:hover:not(:disabled){border-color:var(--ink)}
+.btn-wa{background:#1FA855;color:#fff}            .btn-wa:hover:not(:disabled){background:#178043}
+.btn-sm{padding:7px 12px;font-size:12.5px}
+.btn-block{width:100%}
+
+/* ── بطاقات وشارات ────────────────────────────────────── */
+.card{background:var(--paper);border:1px solid var(--line);border-radius:7px}
+.chead{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.chead h2{font-size:16px;font-weight:800;flex-grow:1}
+.chead a{font-size:13px;color:var(--shop-text);font-weight:700}
+
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.b-wait{background:rgba(232,160,32,.15);color:#8a5d05}
+.b-ok  {background:rgba(46,139,87,.15);color:#1f6b40}
+.b-done{background:var(--sand);color:var(--soft)}
+.b-off {background:rgba(214,40,40,.12);color:#a11}
+
+/* ── حقول ─────────────────────────────────────────────── */
+.field{display:block;margin-bottom:16px}
+.field > span{display:block;font-size:12.5px;font-weight:700;margin-bottom:6px}
+.field > small{display:block;font-size:11.5px;color:var(--soft);margin-top:5px}
+.input,input[type=text],input[type=tel],input[type=search],input[type=number],input[type=password],select,textarea{
+  width:100%;background:var(--paper);border:1.5px solid var(--line);border-radius:5px;padding:10px 12px;
+  transition:border-color .2s}
+.input:focus,input:focus,select:focus,textarea:focus{outline:none;border-color:var(--shop)}
+textarea{resize:vertical;min-height:88px;line-height:1.7}
+.err{color:var(--danger);font-size:12px;font-weight:700;margin-top:6px}
+.hint-ok{color:var(--ok);font-size:12px;font-weight:700;margin-top:6px}
+
+/* ── إشعار عابر ───────────────────────────────────────── */
+.toast{position:fixed;bottom:24px;inset-inline-start:24px;z-index:200;background:var(--ink);color:var(--cream);
+  padding:12px 18px;border-radius:5px;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:9px;
+  box-shadow:0 12px 32px -10px rgba(36,31,27,.5);opacity:0;transform:translateY(14px);pointer-events:none;
+  transition:opacity .3s,transform .3s var(--ease);max-width:min(420px,calc(100vw - 48px))}
+.toast.on{opacity:1;transform:none}
+.toast.bad{background:var(--danger)}
+
+/* ── شريط «عرض المزيد» أسفل القوائم المُرقَّمة ─────────── */
+.more-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;padding:22px 0 6px}
+.more-wrap small{color:var(--soft);font-size:12px}
+.more-wrap .btn{min-width:150px}
+
+/* ── حالات فارغة ──────────────────────────────────────── */
+.empty{text-align:center;padding:52px 20px;color:var(--soft)}
+.empty p{margin-top:12px;font-size:13.5px;line-height:1.9}
+.empty svg{margin:0 auto}
+
+/* ── طبقة تعتيم ونوافذ ────────────────────────────────── */
+.veil{position:fixed;inset:0;background:rgba(36,31,27,.5);backdrop-filter:blur(2px);z-index:90;opacity:0;
+  pointer-events:none;transition:opacity .3s}
+.veil.on{opacity:1;pointer-events:auto}
+
+/* ── أدوات ────────────────────────────────────────────── */
+.wrap{width:min(1200px,92vw);margin-inline:auto}
+.money{font-family:var(--display);font-weight:700;white-space:nowrap}
+.cur{font-size:.72em;color:var(--soft);font-weight:500;font-family:var(--body)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.spin{width:17px;height:17px;border:2px solid rgba(250,243,232,.35);border-top-color:currentColor;
+  border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.skel{background:linear-gradient(90deg,var(--sand) 25%,var(--line) 37%,var(--sand) 63%);
+  background-size:400% 100%;animation:sk 1.3s ease infinite;border-radius:4px}
+@keyframes sk{0%{background-position:100% 0}100%{background-position:0 0}}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;scroll-behavior:auto !important}
+}

@@ -1,0 +1,19 @@
+# الأسرار — لا تدخل الصورة أبداً
+.env
+.env.*
+
+# البيانات تعيش في حجم، لا في الصورة
+data/
+
+# لا لزوم لها في الإنتاج
+test/
+node_modules/
+*.md
+!README.md
+.git/
+.gitignore
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store

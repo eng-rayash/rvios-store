@@ -1,0 +1,137 @@
+/* ═══════════════════════════════════════════════════════════
+   درجات التصميم والسكِنات — §٢.١ + §٣.٦
+
+   الباقة لا تشتري «عدداً أكبر من المنتجات» فحسب، بل **مستوى
+   تصميم أعلى** لواجهة المتجر:
+
+     clean     (مجانية) — واجهة صافية صادقة بلا زخرفة.
+     warm      (بلس)    — تدرّجات وظلال وظهور تدريجي وشريط تصنيفات.
+     signature (برو)    — وهج محيط وزجاجية وعنوان متدرّج وسكِنات.
+
+   قاعدة أخلاقية مقابلة (§٢.١ NEVER_GATED): لا نُبطئ الباقة
+   المجانية ولا نُقبّحها. «نقي» خيار تصميمي مكتمل، والفرق
+   إضافة لا انتقاص.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ═══ الطبقة النقية — مجانية ═══════════════════════════ */
+html[data-tier="clean"] .rv{opacity:1;transform:none;transition:none}
+html[data-tier="clean"] .hero .in{padding:52px 0 42px}
+html[data-tier="clean"] .hero h1{font-size:clamp(34px,5.6vw,52px)}
+html[data-tier="clean"] .hero .wash{background:linear-gradient(to top,var(--cream) 2%,transparent 65%)}
+html[data-tier="clean"] .lm{background:var(--shop);border-radius:50%;box-shadow:none}
+html[data-tier="clean"] .ib,
+html[data-tier="clean"] .fitem,
+html[data-tier="clean"] .rpill{border-radius:6px}
+html[data-tier="clean"] .ib{border-radius:50%}
+html[data-tier="clean"] .pcard{border-radius:10px}
+html[data-tier="clean"] .pcard:hover{box-shadow:var(--shadow)}
+html[data-tier="clean"] .shot{aspect-ratio:1}
+html[data-tier="clean"] .peek{background:rgba(0,0,0,.78);padding:10px 9px}
+html[data-tier="clean"] .buy .add,
+html[data-tier="clean"] .wain,
+html[data-tier="clean"] .sfield input,
+html[data-tier="clean"] .tools select{border-radius:6px}
+html[data-tier="clean"] .wabox,
+html[data-tier="clean"] .story-shot{border-radius:10px;box-shadow:none}
+html[data-tier="clean"] .story{background:var(--paper);padding:44px 0}
+html[data-tier="clean"] .story-in{gap:34px}
+html[data-tier="clean"] .story-tag{box-shadow:none;border-radius:6px}
+html[data-tier="clean"] .foot::before{display:none}
+html[data-tier="clean"] .chip.sale{background:var(--shop);box-shadow:none}
+
+/* ═══ الطبقة الدافئة — بلس ═════════════════════════════ */
+html[data-tier="warm"] .hdr{background:color-mix(in srgb,var(--cream) 88%,transparent);backdrop-filter:blur(12px)}
+@supports not (background:color-mix(in srgb,red 50%,transparent)){
+  html[data-tier="warm"] .hdr{background:var(--cream)}
+}
+html[data-tier="warm"] .pcard:hover{transform:translateY(-5px);box-shadow:var(--shadow-lift)}
+html[data-tier="warm"] .hero .in{padding:76px 0 60px}
+html[data-tier="warm"] .story-shot{border-radius:26px}
+html[data-tier="warm"] .trust .tcell:hover .ic{background:var(--shop);color:var(--on-shop);border-color:var(--shop)}
+html[data-tier="warm"] .tcell .ic{transition:background .3s,color .3s,border-color .3s}
+
+/* ═══ الطبقة الفاخرة — برو ═════════════════════════════ */
+html[data-tier="signature"] .ambient{display:block}
+
+/* هيدر زجاجي بخيط ملوّن */
+html[data-tier="signature"] .hdr{background:color-mix(in srgb,var(--cream) 72%,transparent);backdrop-filter:blur(18px) saturate(140%)}
+@supports not (background:color-mix(in srgb,red 50%,transparent)){
+  html[data-tier="signature"] .hdr{background:var(--cream)}
+}
+html[data-tier="signature"] .hdr.stuck::after{content:"";position:absolute;inset-inline:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--shop),var(--brass),transparent)}
+
+/* عنوان بتدرّج — على الورق فقط، أما فوق الصورة فالأبيض أوضح */
+html[data-tier="signature"] .hero:not(.shot) h1{
+  background:linear-gradient(115deg,var(--ink) 18%,var(--shop) 58%,var(--brass-deep) 96%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-fill-color:transparent;padding-bottom:.08em}
+html[data-tier="signature"] .hero .in{padding:92px 0 72px}
+html[data-tier="signature"] .hero .eyebrow::before,
+html[data-tier="signature"] .story .eyebrow::before{content:"";display:inline-block;width:26px;height:1px;
+  background:currentColor;vertical-align:middle;margin-inline-end:10px;opacity:.6}
+
+/* بطاقة منتج بضوء يتبع المؤشر (المتغيّران يُحدّثهما JS) */
+html[data-tier="signature"] .pcard{transition:transform .45s var(--ease),box-shadow .45s var(--ease),border-color .35s}
+html[data-tier="signature"] .pcard::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;
+  transition:opacity .45s var(--ease);mix-blend-mode:screen;
+  background:radial-gradient(340px circle at var(--mx,50%) var(--my,0%),var(--glow),transparent 62%)}
+html[data-tier="signature"] .pcard:hover{transform:translateY(-7px);box-shadow:var(--shadow-lift);border-color:transparent}
+html[data-tier="signature"] .pcard:hover::after{opacity:1}
+html[data-tier="signature"] .pcard::before{content:"";position:absolute;inset:0;z-index:4;pointer-events:none;
+  border-radius:inherit;padding:1px;opacity:0;transition:opacity .45s;
+  background:linear-gradient(140deg,var(--shop),transparent 42%,var(--brass));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude}
+html[data-tier="signature"] .pcard:hover::before{opacity:1}
+
+html[data-tier="signature"] .story-shot{border-radius:30px}
+html[data-tier="signature"] .story-shot::after{content:"";position:absolute;inset:0;border-radius:inherit;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);pointer-events:none}
+html[data-tier="signature"] .wabox{border-radius:26px}
+html[data-tier="signature"] .modal{border-radius:26px}
+
+/* ═══ سكِن: تحريري (برو) ═══════════════════════════════
+   مساحة بيضاء واسعة، عناوين كبيرة، صور تقود الصفحة. */
+html[data-skin="editorial"] .hero .in{text-align:start;padding:104px 0 78px;max-width:min(760px,92vw);margin-inline:0}
+html[data-skin="editorial"] .hero p{margin-inline:0}
+html[data-skin="editorial"] .hero .meta,
+html[data-skin="editorial"] .hcta{justify-content:flex-start}
+html[data-skin="editorial"] .hero h1{font-size:clamp(42px,8vw,86px);letter-spacing:-1.5px}
+html[data-skin="editorial"] .grid{gap:34px}
+html[data-skin="editorial"] .pcard{background:transparent;border:none;border-radius:0;box-shadow:none !important}
+html[data-skin="editorial"] .pcard:hover{transform:none}
+html[data-skin="editorial"] .pcard::before{display:none}
+html[data-skin="editorial"] .shot{border-radius:18px;aspect-ratio:3/4}
+html[data-skin="editorial"] .info{padding:14px 2px 0}
+html[data-skin="editorial"] .info h3{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.25}
+html[data-skin="editorial"] .buy .add{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+html[data-skin="editorial"] .buy .add:hover:not(:disabled){background:var(--ink);color:var(--cream)}
+html[data-skin="editorial"] .story{background:transparent}
+html[data-skin="editorial"] .story-in{grid-template-columns:5fr 6fr}
+
+/* ═══ سكِن: منتصف الليل (برو) ══════════════════════════
+   الأسطح الداكنة تأتي من محرّك اللون (dark:true)، وهنا
+   نضبط ما لا يُشتق: شدّة الصور والحدود والوهج. */
+html[data-skin="midnight"]{color-scheme:dark}
+html[data-skin="midnight"] .ambient{display:block}
+html[data-skin="midnight"] .orb{filter:blur(110px);opacity:.9}
+html[data-skin="midnight"] .grain{mix-blend-mode:overlay;opacity:.28}
+html[data-skin="midnight"] .hdr{background:color-mix(in srgb,var(--cream) 74%,transparent);backdrop-filter:blur(18px)}
+@supports not (background:color-mix(in srgb,red 50%,transparent)){
+  html[data-skin="midnight"] .hdr{background:var(--cream)}
+}
+html[data-skin="midnight"] .hero .wash{background:linear-gradient(to top,var(--cream) 3%,transparent 70%),
+  linear-gradient(150deg,var(--glow),transparent 62%)}
+html[data-skin="midnight"] .hero.shot .bg img{opacity:.62}
+html[data-skin="midnight"] .shot img{filter:brightness(.94);transition:transform .7s var(--ease),filter .5s}
+html[data-skin="midnight"] .pcard:hover .shot img{filter:none}
+html[data-skin="midnight"] .foot{background:var(--paper);border-top:1px solid var(--line)}
+html[data-skin="midnight"] .plat,
+html[data-skin="midnight"] .trackbar{background:var(--paper);color:var(--ink);border-bottom:1px solid var(--line)}
+html[data-skin="midnight"] .buy .add,
+html[data-skin="midnight"] .mact .add{background:var(--shop);color:var(--on-shop)}
+html[data-skin="midnight"] .peek{background:linear-gradient(to top,rgba(0,0,0,.9),transparent)}
+html[data-skin="midnight"] .veil{background:rgba(0,0,0,.68)}
+html[data-skin="midnight"] .toast{background:var(--paper);color:var(--ink);border:1px solid var(--line)}

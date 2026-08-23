@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/assets/img/logo.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#9E2226">
+<link rel="apple-touch-icon" href="/assets/img/logo.png">
+<title>لا يوجد متجر بهذا الرابط | RVIOS Store</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<style>
+  body{display:grid;place-items:center;min-height:100vh;padding:24px;text-align:center}
+  .box{max-width:520px}
+  .sign{width:132px;height:96px;margin:0 auto 26px;position:relative}
+  .sign .bar{position:absolute;top:0;inset-inline:14px;height:3px;background:var(--brass);border-radius:2px}
+  .sign .plate{position:absolute;top:14px;inset-inline:0;bottom:0;background:var(--paper);border:1px solid var(--line);
+    border-radius:6px;display:grid;place-items:center;box-shadow:var(--shadow)}
+  .sign .plate span{font-family:var(--display);font-size:40px;color:var(--line);font-weight:700}
+  .sign i{position:absolute;top:3px;width:1px;height:12px;background:var(--brass-deep)}
+  .sign i:first-of-type{inset-inline-start:24px} .sign i:last-of-type{inset-inline-end:24px}
+  h1{font-family:var(--display);font-size:clamp(30px,6vw,42px);font-weight:700;line-height:1.2}
+  p{color:var(--soft);margin:12px 0 26px;font-size:15px;line-height:1.9}
+  .acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  code{background:var(--sand);padding:2px 8px;border-radius:4px;font-size:13px;direction:ltr;display:inline-block}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="sign">
+    <div class="bar"></div><i></i><i></i>
+    <div class="plate"><span>؟</span></div>
+  </div>
+  <h1>لا توجد لوحة على هذا الرابط</h1>
+  <p>
+    الرابط <code id="slug"></code> غير مسجّل على المنصة.<br>
+    تأكد من كتابته، أو احجزه لمتجرك أنت — ما زال متاحاً.
+  </p>
+  <div class="acts">
+    <a href="/onboarding" class="btn btn-fill">احجز هذا الرابط مجاناً</a>
+    <a href="/" class="btn btn-line">الصفحة الرئيسية</a>
+  </div>
+</div>
+<script src="/assets/js/page-404.js"></script>
+<script src="/assets/js/pwa.js" defer></script>
+</body>
+</html>

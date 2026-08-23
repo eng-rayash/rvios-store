@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════════════════════════
+#  خدمة systemd لـ RVIOS Store
+#      sudo cp ops/rvios.service /etc/systemd/system/
+#      sudo systemctl enable --now rvios
+#      sudo journalctl -u rvios -f
+# ═══════════════════════════════════════════════════════════
+[Unit]
+Description=RVIOS Store
+Documentation=https://github.com/rvios/store
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rvios
+Group=rvios
+WorkingDirectory=/srv/rvios
+
+# الأسرار من ملف بصلاحيات 600 يملكه rvios — لا في سطر الأمر،
+# فسطر الأمر يظهر لكل مستخدم على الخادم عبر ps
+EnvironmentFile=/srv/rvios/.env
+Environment=NODE_ENV=production
+Environment=LOG_JSON=1
+
+ExecStart=/usr/bin/node --no-warnings src/server.js
+
+# SIGTERM يفعّل الإيقاف الرشيد: يتوقّف القبول، تنتهي الطلبات
+# الجارية، تُؤخذ نسخة أخيرة، ثم تُغلق القاعدة.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+Restart=always
+RestartSec=3
+
+# ── العزل: ثغرة في التطبيق لا تصبح ثغرة في الخادم ──────
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+# المسار الوحيد القابل للكتابة
+ReadWritePaths=/srv/rvios/data
+
+# السجل إلى journald — LOG_JSON=1 يجعله قابلاً للاستعلام
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rvios
+
+[Install]
+WantedBy=multi-user.target

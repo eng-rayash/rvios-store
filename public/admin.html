@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/assets/img/logo.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#9E2226">
+<link rel="apple-touch-icon" href="/assets/img/logo.png">
+<title>إدارة المنصة — RVIOS Store</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/dash.css">
+<style>
+  :root{--shop:#241F1B;--shop-deep:#000}
+  .gate{display:grid;place-items:center;min-height:100vh;padding:24px}
+  .gate .box{width:min(400px,92vw);text-align:center}
+  .gate h1{font-family:var(--display);font-size:34px;font-weight:700;margin-bottom:6px}
+  .gate p{color:var(--soft);font-size:13.5px;margin-bottom:22px}
+  .statgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .stat{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:16px 18px}
+  .stat small{font-size:12px;color:var(--soft);display:block}
+  .stat b{font-family:var(--display);font-size:32px;font-weight:700;display:block;line-height:1.2}
+  .stat i{font-style:normal;font-size:11.5px;color:var(--soft)}
+  .stat.key{background:var(--ink);color:var(--cream);border-color:var(--ink)}
+  .stat.key small,.stat.key i{color:rgba(250,243,232,.6)}
+  @media(max-width:1100px){.statgrid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<!-- بوابة الدخول -->
+<div class="gate" id="gate">
+  <div class="box">
+    <img src="/assets/img/logo.png" alt="RVIOS">
+    <h1>إدارة المنصة</h1>
+    <p>هذه اللوحة لفريق RVIOS فقط.</p>
+    <label class="field">
+      <input type="password" id="pass" placeholder="كلمة المرور" autocomplete="current-password">
+      <div class="err" id="gateErr" hidden></div>
+    </label>
+    <button class="btn btn-dark btn-block" id="enter">دخول</button>
+  </div>
+</div>
+
+<!-- اللوحة -->
+<div class="app" id="panel" hidden>
+  <aside class="side" id="side">
+    <a href="/" class="logo">
+      <img src="/assets/img/logo.png" alt="RVIOS">
+      <span><b>RVIOS</b><i>A D M I N</i></span>
+    </a>
+    <nav class="nav">
+      <small>المنصة</small>
+      <button class="on" data-v="stats">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>الإحصائيات
+      </button>
+      <button data-v="stores">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16l-1 5H5z"/><path d="M5 9v11h14V9"/></svg>المتاجر
+      </button>
+      <small>المراجعة</small>
+      <button data-v="payments">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>مراجعة المدفوعات
+        <span class="pill" id="payPill" hidden>0</span>
+      </button>
+      <button data-v="reports">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v5M12 17.5v.5"/><path d="M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>البلاغات
+        <span class="pill" id="repPill" hidden>0</span>
+      </button>
+      <button data-v="requests">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>الطلبات والتوثيق
+        <span class="pill" id="reqPill" hidden>0</span>
+      </button>
+      <button data-v="plans">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>الباقات
+      </button>
+    </nav>
+    <div class="foot">
+      <button id="logout">خروج</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <button class="ico burger" id="burger" aria-label="القائمة">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1 id="ttl">الإحصائيات</h1>
+    </header>
+
+    <div class="page">
+      <section class="view on" id="v-stats">
+        <div class="statgrid" id="stats"></div>
+        <div class="card"><div class="chead"><h2>مؤشرات القياس (§١٠)</h2></div><div id="funnel" class="body"></div></div>
+      </section>
+
+      <section class="view" id="v-stores">
+        <div class="card">
+          <div class="chead">
+            <h2>المتاجر</h2>
+            <input type="search" id="storeQ" placeholder="ابحث باسم المتجر أو الرابط أو رقم التاجر" style="max-width:320px">
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>المتجر</th><th>التاجر</th><th>الباقة</th><th>منتجات</th><th>طلبات</th><th>الحالة</th><th></th></tr></thead>
+              <tbody id="storeRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- §٥.٦ — أكثر أقسام اللوحة استخداماً -->
+      <section class="view" id="v-payments">
+        <div class="tabs">
+          <button class="tab on" data-is="under_review">قيد المراجعة</button>
+          <button class="tab" data-is="unpaid">بانتظار الدفع</button>
+          <button class="tab" data-is="paid">مدفوعة</button>
+          <button class="tab" data-is="void">ملغاة</button>
+        </div>
+        <div class="card"><div id="invRows"></div></div>
+      </section>
+
+      <section class="view" id="v-reports">
+        <div class="tabs">
+          <button class="tab on" data-rs="open">مفتوحة</button>
+          <button class="tab" data-rs="closed">مغلقة</button>
+        </div>
+        <div class="card"><div id="reportRows"></div></div>
+      </section>
+
+      <section class="view" id="v-requests">
+        <div class="tabs">
+          <button class="tab on" data-qs="open">مفتوحة</button>
+          <button class="tab" data-qs="done">منجزة</button>
+          <button class="tab" data-qs="rejected">مرفوضة</button>
+        </div>
+        <div class="card"><div id="reqRows"></div></div>
+      </section>
+
+      <section class="view" id="v-plans">
+        <div class="plans" id="planRows"></div>
+
+        <div class="card" style="margin-top:18px">
+          <div class="chead"><h2>الأسعار وتعليمات التحصيل</h2></div>
+          <div class="body">
+            <p style="font-size:13px;color:var(--soft);line-height:1.95;margin-bottom:18px">
+              تُحفظ في قاعدة البيانات لا في الكود، فتغييرها لا يتطلب إعادة نشر.
+              <b style="color:var(--ink)">الباقة بلا سعر تظهر «—» ولا يمكن شراؤها</b> —
+              فلا يُعرض على التاجر رقم مخترع.
+            </p>
+
+            <div class="grid2">
+              <div>
+                <h4 style="font-size:13px;font-weight:800;margin-bottom:10px">أسعار الباقات (ر.ي شهرياً)</h4>
+                <label class="field"><span>بلس</span><input type="number" id="setPlus" min="0" inputmode="numeric" placeholder="لم يُحدَّد"></label>
+                <label class="field"><span>برو</span><input type="number" id="setPro" min="0" inputmode="numeric" placeholder="لم يُحدَّد"></label>
+                <label class="field">
+                  <span>شهور مجانية في الاشتراك السنوي</span>
+                  <input type="number" id="setYearly" min="0" max="6" inputmode="numeric">
+                </label>
+
+                <h4 style="font-size:13px;font-weight:800;margin:20px 0 10px">الخدمات (ر.ي)</h4>
+                <label class="field"><span>إنشاء متجر</span><input type="number" id="setBuild" min="0" inputmode="numeric" placeholder="لم يُحدَّد"></label>
+                <label class="field"><span>دومين مخصص</span><input type="number" id="setDomain" min="0" inputmode="numeric" placeholder="لم يُحدَّد"></label>
+                <label class="field"><span>خانة متجر إضافي (شهرياً)</span><input type="number" id="setExtra" min="0" inputmode="numeric" placeholder="لم يُحدَّد"></label>
+              </div>
+
+              <div>
+                <h4 style="font-size:13px;font-weight:800;margin-bottom:10px">تعليمات التحويل</h4>
+                <p style="font-size:12.5px;color:var(--soft);line-height:1.9;margin-bottom:12px">
+                  الوسيلة بلا تعليمات <b style="color:var(--ink)">لا تظهر للتاجر</b> —
+                  فلا نعلن وسيلة لم تتحقق منها.
+                </p>
+                <label class="field"><span>بنك الكريمي</span><textarea id="setKuraimi" maxlength="600" placeholder="رقم الحساب والاسم، وتنبيه بكتابة المرجع في الملاحظات"></textarea></label>
+                <label class="field"><span>محفظة جيب</span><textarea id="setJaib" maxlength="600" placeholder="رقم المحفظة والاسم"></textarea></label>
+                <label class="field"><span>PayPal</span><textarea id="setPaypal" maxlength="600" placeholder="اتركه فارغاً حتى تتحقق من قيود حسابك"></textarea></label>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+              <button class="btn btn-dark" id="saveSettings">حفظ الإعدادات</button>
+              <small id="settingsHint" style="color:var(--soft);font-size:12.5px"></small>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/assets/js/admin.js"></script>
+<script src="/assets/js/pwa.js" defer></script>
+</body>
+</html>

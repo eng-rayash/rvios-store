@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/assets/img/logo.png">
+<title>لا يوجد اتصال | RVIOS Store</title>
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<style>
+  body{display:grid;place-items:center;min-height:100vh;padding:24px;text-align:center}
+  .box{max-width:460px}
+  .wave{width:120px;height:80px;margin:0 auto 26px;position:relative;display:grid;place-items:end center}
+  .wave i{position:absolute;bottom:8px;border:3px solid var(--line);border-bottom-color:transparent;
+    border-inline-color:transparent;border-radius:50%}
+  .wave i:nth-child(1){width:34px;height:34px}
+  .wave i:nth-child(2){width:64px;height:64px}
+  .wave i:nth-child(3){width:96px;height:96px}
+  .wave b{width:9px;height:9px;background:var(--soft);border-radius:50%;position:relative;bottom:4px}
+  .slash{position:absolute;inset:0;margin:auto;width:104px;height:2.5px;background:var(--danger);
+    border-radius:2px;transform:rotate(-45deg);top:14px}
+  h1{font-family:var(--display);font-size:clamp(28px,6vw,38px);font-weight:700;line-height:1.25}
+  p{color:var(--soft);margin:12px 0 26px;font-size:15px;line-height:1.9}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="wave">
+    <i></i><i></i><i></i><b></b>
+    <span class="slash"></span>
+  </div>
+  <h1>لا يوجد اتصال</h1>
+  <p>
+    تعذّر الوصول إلى الشبكة. متجرك وبياناتك سليمة ولم يتغيّر شيء —
+    المشكلة في الاتصال وحده.
+  </p>
+  <div>
+    <button class="btn btn-fill" id="retry">أعد المحاولة</button>
+  </div>
+</div>
+<script src="/assets/js/offline.js"></script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/assets/img/logo.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#9E2226">
+<link rel="apple-touch-icon" href="/assets/img/logo.png">
+<title>تواصل معنا — RVIOS Store</title>
+<meta name="description" content="اطلب خدمة «نُنشئ متجرك بدلاً عنك» أو دوميناً مخصصاً، أو تواصل مع فريق RVIOS Store.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/site.css">
+<noscript><style>.rv{opacity:1 !important;transform:none !important}</style></noscript>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true"><div class="glow g1"></div><div class="glow g2"></div></div>
+
+<header class="site-hdr" id="hdr">
+  <div class="wrap">
+    <a href="/" class="brand">
+      <img src="/assets/img/logo.png" alt="RVIOS" class="mark">
+      <span class="word"><b>RVIOS</b><i>S T O R E</i></span>
+    </a>
+    <nav class="site-nav">
+      <a href="/#steps">كيف يعمل</a>
+      <a href="/sectors">القطاعات</a>
+      <a href="/pricing">الباقات</a>
+      <a href="/about">عن المنصة</a>
+    </nav>
+    <div class="hactions">
+      <a href="/login" class="ghost">تسجيل الدخول</a>
+      <a href="/onboarding" class="solid"><span>ابدأ مجاناً</span></a>
+    </div>
+    <button class="burger" id="burger" aria-label="القائمة"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<div class="wrap" style="padding:60px 0 90px;display:grid;grid-template-columns:1.1fr 1fr;gap:56px;align-items:start" id="grid">
+  <div>
+    <div class="kick">تواصل معنا</div>
+    <h1 style="font-family:var(--display);font-size:clamp(32px,5vw,48px);font-weight:700;line-height:1.2;margin:13px 0 12px">
+      كيف نساعدك؟
+    </h1>
+    <p style="color:var(--soft);font-size:15px;line-height:1.9;margin-bottom:32px">
+      اترك رقم واتساب ونوع طلبك، ونتواصل معك. عادة خلال يوم عمل واحد.
+    </p>
+
+    <form id="form" novalidate>
+      <label class="field">
+        <span>نوع الطلب</span>
+        <select id="kind">
+          <option value="build">نُنشئ متجري بدلاً عني</option>
+          <option value="domain">دومين مخصص</option>
+          <option value="store">متجر إضافي</option>
+          <option value="other">استفسار آخر</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>رقم واتساب</span>
+        <div style="display:flex;align-items:center;background:var(--paper);border:1.5px solid var(--line);border-radius:5px;overflow:hidden">
+          <span style="padding:10px 12px;background:var(--sand);color:var(--soft);font-size:13px;direction:ltr">+967</span>
+          <input type="tel" id="contact" inputmode="numeric" placeholder="٧٧٧ ١٢٣ ٤٥٦" style="border:none">
+        </div>
+      </label>
+
+      <label class="field">
+        <span>تفاصيل طلبك</span>
+        <textarea id="detail" placeholder="مثال: لدي ٤٠ منتجاً وأريد متجراً جاهزاً بهويتي البصرية." maxlength="800"></textarea>
+      </label>
+
+      <div class="err" id="err" hidden></div>
+      <button class="btn btn-fill" id="send" type="submit">أرسل الطلب</button>
+    </form>
+
+    <div id="done" hidden style="text-align:center;padding:40px 20px">
+      <div style="width:70px;height:70px;border-radius:50%;background:rgba(46,139,87,.14);display:grid;place-items:center;margin:0 auto 18px">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h2 style="font-family:var(--display);font-size:30px;font-weight:700">وصلنا طلبك</h2>
+      <p style="color:var(--soft);margin-top:10px;line-height:1.9">سنتواصل معك عبر واتساب قريباً.</p>
+      <a href="/" class="btn btn-line" style="margin-top:20px">العودة للرئيسية</a>
+    </div>
+  </div>
+
+  <aside>
+    <div class="card" style="padding:26px">
+      <h3 style="font-family:var(--display);font-size:26px;font-weight:700;margin-bottom:14px">نُنشئ متجرك بدلاً عنك</h3>
+      <p style="font-size:13.5px;color:var(--soft);line-height:1.95">
+        يتولى فريقنا رفع منتجاتك وكتابة أوصافها وضبط هويتك البصرية كاملة،
+        وتستلم متجراً جاهزاً للمشاركة في اليوم نفسه.
+      </p>
+      <ul style="margin-top:16px">
+        <li style="display:flex;gap:9px;padding:6px 0;font-size:13.5px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
+          رفع المنتجات وتنظيمها في تصنيفات</li>
+        <li style="display:flex;gap:9px;padding:6px 0;font-size:13.5px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
+          ضبط الشعار والألوان وصورة الغلاف</li>
+        <li style="display:flex;gap:9px;padding:6px 0;font-size:13.5px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
+          تدريب قصير على إدارة الطلبات</li>
+      </ul>
+      <p style="font-size:12.5px;color:var(--soft);margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+        نستقبل عدداً محدوداً من الطلبات شهرياً حفاظاً على جودة التنفيذ.
+      </p>
+    </div>
+
+    <div class="card" style="padding:22px;margin-top:18px">
+      <h4 style="font-size:14px;font-weight:800;margin-bottom:10px">هل تريد البدء بنفسك؟</h4>
+      <p style="font-size:13px;color:var(--soft);line-height:1.9;margin-bottom:14px">
+        الإعداد لا يستغرق أكثر من بضع دقائق، ولا يحتاج أي خبرة تقنية.
+      </p>
+      <a href="/onboarding" class="btn btn-fill btn-sm btn-block">أنشئ متجري الآن</a>
+    </div>
+  </aside>
+</div>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="fbot" style="border:none;padding:0">
+      <span>© ٢٠٢٦ RVIOS Store. جميع الحقوق محفوظة.</span>
+      <span><a href="/legal#terms">الشروط</a> · <a href="/legal#privacy">الخصوصية</a></span>
+    </div>
+  </div>
+</footer>
+
+<style>@media(max-width:900px){#grid{grid-template-columns:1fr !important;gap:34px !important}}</style>
+
+<script type="module" src="/assets/js/page-contact.js"></script>
+<script src="/assets/js/pwa.js" defer></script>
+</body>
+</html>

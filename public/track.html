@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/assets/img/logo.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#9E2226">
+<link rel="apple-touch-icon" href="/assets/img/logo.png">
+<title>تتبّع طلبك — RVIOS Store</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<style>
+  body{display:flex;flex-direction:column;min-height:100vh}
+  .wrap{width:min(680px,92vw);margin-inline:auto;padding:40px 0 60px;flex-grow:1}
+  .brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:32px}
+  .brand img{width:38px;height:auto}
+  .brand b{font-family:var(--display);font-size:23px;line-height:1}
+  .brand i{font-style:normal;font-size:8.5px;letter-spacing:3px;color:var(--soft);display:block;margin-top:2px}
+  h1{font-family:var(--display);font-size:clamp(30px,5vw,42px);font-weight:700;text-align:center;line-height:1.2}
+  .lede{color:var(--soft);text-align:center;margin:10px 0 28px;font-size:14.5px;line-height:1.85}
+
+  .find{display:flex;gap:9px;margin-bottom:26px}
+  .find input{text-transform:uppercase;direction:ltr;text-align:center;font-weight:700;letter-spacing:1px}
+
+  /* خط زمني لحالة الطلب */
+  .track{padding:24px}
+  .ref{font-family:var(--display);font-size:32px;font-weight:700;color:var(--shop);direction:ltr;text-align:center}
+  .when{text-align:center;color:var(--soft);font-size:12.5px;margin-top:2px}
+  .line{display:flex;justify-content:space-between;margin:28px 0 8px;position:relative}
+  .line::before{content:"";position:absolute;top:13px;inset-inline:14px;height:2px;background:var(--line)}
+  .line i{position:absolute;top:13px;inset-inline-start:14px;height:2px;background:var(--shop);
+    transition:width .6s var(--ease)}
+  .node{position:relative;z-index:2;text-align:center;flex:1}
+  .node .dot{width:28px;height:28px;border-radius:50%;background:var(--sand);border:2px solid var(--line);
+    margin:0 auto 8px;display:grid;place-items:center;color:var(--soft)}
+  .node.done .dot{background:var(--shop);border-color:var(--shop);color:#fff}
+  .node.cancel .dot{background:var(--danger);border-color:var(--danger);color:#fff}
+  .node span{font-size:12px;color:var(--soft);font-weight:700}
+  .node.done span{color:var(--ink)}
+
+  .items{border-top:1px solid var(--line);margin-top:24px;padding-top:16px}
+  .row{display:flex;justify-content:space-between;padding:8px 0;font-size:13.5px}
+  .row.tot{border-top:1px dashed var(--line);margin-top:8px;padding-top:12px;font-weight:700;font-size:15px}
+  .row.tot b{font-family:var(--display);font-size:24px}
+  .foot{text-align:center;padding:20px;font-size:12.5px;color:var(--soft)}
+  .foot a{color:var(--shop);font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <a href="/" class="brand">
+    <img src="/assets/img/logo.png" alt="RVIOS">
+    <span><b>RVIOS</b><i>S T O R E</i></span>
+  </a>
+
+  <h1>تتبّع طلبك</h1>
+  <p class="lede">أدخل الرقم المرجعي الذي ظهر لك عند تأكيد الطلب.</p>
+
+  <div class="find">
+    <input type="text" id="ref" placeholder="RS-XXXXX" maxlength="8" aria-label="الرقم المرجعي"
+           autocapitalize="characters" spellcheck="false">
+    <button class="btn btn-fill" id="go">تتبّع</button>
+  </div>
+
+  <div class="err" id="err" hidden style="text-align:center"></div>
+  <div class="card track" id="result" hidden></div>
+</div>
+
+<div class="foot">
+  متجر على منصة <a href="/">RVIOS Store</a>
+</div>
+
+<script type="module" src="/assets/js/page-track.js"></script>
+<script src="/assets/js/pwa.js" defer></script>
+</body>
+</html>
