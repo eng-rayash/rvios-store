@@ -57,7 +57,7 @@ const s1 = store(m1, {
   hours: 'السبت – الخميس: ٩ص – ٩م · الجمعة: ٤م – ٩م',
   color: '#9E2226',
   color_deep: '#6E1519',
-  banner: '/assets/img/sectors/perfumes.png',
+  banner: '/assets/img/sectors/perfumes.jpg',
   // صورة العرض غير الغلاف — تظهر في قسم «قصة المتجر» (§٣.٤)
   showcase: '/assets/img/p3.jpg',
   plan: 'plus',
@@ -157,7 +157,7 @@ const s2 = store(m2, {
   whatsapp: '733445566',
   hours: 'يومياً ١٠ص – ١٠م',
   color: '#2F5D50', color_deep: '#1E3E35',
-  banner: '/assets/img/sectors/fashion.png',
+  banner: '/assets/img/sectors/fashion.jpg',
   plan: 'basic', verified: 0,
 });
 const S2 = scope(s2);
@@ -185,8 +185,8 @@ const s4 = store(m4, {
   whatsapp: '712334455',
   hours: 'السبت – الخميس: ٩ص – ١٠م',
   color: '#1F4E79', color_deep: '#143451',
-  banner: '/assets/img/sectors/electronics.png',
-  showcase: '/assets/img/sectors/accessories.png',
+  banner: '/assets/img/sectors/electronics.jpg',
+  showcase: '/assets/img/sectors/accessories.jpg',
   theme: 'midnight',
   plan: 'pro', verified: 1,
   delivery_fee: 2000, delivery_free_over: 80000,

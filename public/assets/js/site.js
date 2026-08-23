@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 //  الموقع التسويقي (§٣.١) — الهدف الوحيد: تحويل الزائر لمسجّل
 // ═══════════════════════════════════════════════════════════
-import { $, $$, api, AR, escapeHtml, scopeTheme } from './app.js';
+import { $, $$, api, AR, escapeHtml, scopeTheme, planCard } from './app.js';
 
 // ── الهيدر اللاصق ────────────────────────────────────────
 const hdr = $('#hdr');
@@ -142,7 +142,7 @@ if (trow) {
     <a class="tag rv" data-d="${(i % 6) + 1}" href="/sectors">
       <div class="str"></div>
       <div class="plate">
-        <img src="/assets/img/sectors/${s.img}.png" alt="${s.alt}" loading="lazy" decoding="async" width="360" height="360">
+        <img src="/assets/img/sectors/${s.img}.jpg" alt="${s.alt}" loading="lazy" decoding="async" width="360" height="360">
       </div>
       <span>${s.name}</span>
     </a>`).join('');
@@ -188,18 +188,7 @@ if (mtrack) {
 const prow = $('#prow');
 if (prow) {
   api.get('/api/plans').then((plans) => {
-    prow.innerHTML = plans.map((p, i) => `
-      <div class="pcard card-s ${i === 1 ? "feat" : ""} rv" data-d="${i + 1}">
-        ${i === 1 ? '<div class="ptag">الأكثر اختياراً</div>' : '<div class="ptag">&nbsp;</div>'}
-        <h3>${escapeHtml(p.name)}</h3>
-        <div class="pdesc">${escapeHtml(p.desc)}</div>
-        <div class="pnum">${p.price === 0 ? 'مجانية' : p.price === null ? '—' : AR(p.price)}
-          ${p.price === null ? '<span> / شهرياً</span>' : p.price ? '<span> ر.ي / شهرياً</span>' : ''}</div>
-        <ul>${p.features.map((f) => `<li>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
-          ${escapeHtml(f)}</li>`).join('')}</ul>
-        <a href="/onboarding" class="pbtn">${p.price === 0 ? 'ابدأ مجاناً' : 'اطلب الباقة'}</a>
-      </div>`).join('');
+    prow.innerHTML = plans.map((p, k) => planCard(p, k, { reveal: true })).join('');
     $$('.pcard').forEach((el) => io.observe(el));
   }).catch(() => {});
 }

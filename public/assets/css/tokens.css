@@ -8,9 +8,12 @@
 :root{
   /* الهوية */
   --cream:#FAF3E8;  --paper:#FFFCF6;  --sand:#EFE3CC;  --line:#DFD1B5;
-  --brass:#C8A45D;  --brass-deep:#93712F;
+  /* --brass-deep و--ok مضبوطان على ٤٫٥:١ كحدّ أدنى فوق الورق
+     والكريمي وحجاب المتجر. القيم السابقة (#93712F و#2E8B57) كانت
+     ترسب بين ٣٫٩٧ و٤٫١٥ في عشرة مواضع نصّ صغير. */
+  --brass:#C8A45D;  --brass-deep:#876522;
   --ink:#241F1B;    --soft:#6B6259;
-  --ok:#2E8B57;     --warn:#E8A020;   --danger:#D62828;
+  --ok:#1a7c49;     --warn:#E8A020;   --danger:#D62828;
 
   /* لون المتجر — يُحقن وقت التشغيل */
   --shop:#9E2226;   --shop-deep:#6E1519;   --shop-lift:#C4494D;
@@ -32,21 +35,28 @@
      الخاصة، فتُقرأ الصفحة كستّة مواقع لا موقعاً واحداً */
   --bay:clamp(64px,7vw,96px);
 
-  --r:6px; --r-lg:10px; --r-xl:18px;
+  /* سلّم نصف القطر: خمس درجات تغطّي الموقع كله. كانت ٢٤ قيمة
+     متميّزة مكتوبة بالأرقام في ١٥٤ موضعاً. */
+  --r-sm:6px; --r:10px; --r-lg:14px; --r-xl:18px; --r-pill:40px;
+
+  /* سلّم الخطّ: ست درجات للنصّ وثلاث للعناوين. كانت ٣٨ حجماً
+     متميّزاً، بينها أزواج نصف بكسل (13/13.5) لا يميّزها أحد. */
+  --fs-2xs:11.5px; --fs-xs:12.5px; --fs-sm:13.5px;
+  --fs-md:15px;    --fs-lg:17px;   --fs-xl:20px;
   --shadow:0 1px 2px rgba(36,31,27,.05), 0 8px 24px -12px rgba(36,31,27,.18);
   --shadow-lift:0 26px 60px -26px rgba(36,31,27,.42), 0 2px 6px rgba(36,31,27,.06);
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{background:var(--cream);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{background:var(--cream);color:var(--ink);font-family:var(--body);font-size:var(--fs-sm);line-height:1.6;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 ul{list-style:none}
 svg{display:block;flex-shrink:0}
 img{max-width:100%}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
-:focus-visible{outline:2px solid var(--shop);outline-offset:2px;border-radius:2px}
+input,select,textarea{font-family:inherit;font-size:var(--fs-sm);color:var(--ink)}
+:focus-visible{outline:2px solid var(--shop);outline-offset:2px;border-radius:var(--r-sm)}
 [hidden]{display:none !important}
 
 /* كل ما يلمسه المستخدم يأخذ لون المتجر — التحديد وشريط
@@ -56,12 +66,12 @@ input,textarea{caret-color:var(--shop)}
 *{scrollbar-color:var(--shop-edge) transparent;scrollbar-width:thin}
 ::-webkit-scrollbar{width:11px;height:11px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--shop-edge);border-radius:20px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb{background:var(--shop-edge);border-radius:var(--r-pill);border:3px solid transparent;background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:var(--shop);background-clip:content-box}
 
 /* ── أزرار ────────────────────────────────────────────── */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:13.5px;font-weight:700;
-  padding:10px 17px;border-radius:4px;transition:transform .22s var(--ease),background .22s,color .22s,border-color .22s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:var(--fs-sm);font-weight:700;
+  padding:10px 17px;border-radius:var(--r-sm);transition:transform .22s var(--ease),background .22s,color .22s,border-color .22s}
 .btn:hover:not(:disabled){transform:translateY(-1px)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-fill{background:var(--shop);color:var(--on-shop)} .btn-fill:hover:not(:disabled){background:var(--shop-deep);color:var(--on-shop-deep)}
@@ -72,16 +82,18 @@ input,textarea{caret-color:var(--shop)}
 .btn-dark{background:var(--ink);color:var(--cream)} .btn-dark:hover:not(:disabled){background:#000}
 .btn-line{border:1.5px solid var(--line);background:var(--paper)} .btn-line:hover:not(:disabled){border-color:var(--ink)}
 .btn-wa{background:#1FA855;color:#fff}            .btn-wa:hover:not(:disabled){background:#178043}
-.btn-sm{padding:7px 12px;font-size:12.5px}
+.btn-sm{padding:7px 12px;font-size:var(--fs-xs)}
 .btn-block{width:100%}
 
 /* ── بطاقات وشارات ────────────────────────────────────── */
-.card{background:var(--paper);border:1px solid var(--line);border-radius:7px}
+/* .card و.card-s شيء واحد: بطاقة. كانتا بنصفَي قطر مختلفين
+   (7px و18px) على موقع واحد. */
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-xl)}
 .chead{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.chead h2{font-size:16px;font-weight:800;flex-grow:1}
-.chead a{font-size:13px;color:var(--shop-text);font-weight:700}
+.chead h2{font-size:var(--fs-lg);font-weight:800;flex-grow:1}
+.chead a{font-size:var(--fs-sm);color:var(--shop-text);font-weight:700}
 
-.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-2xs);font-weight:700;padding:4px 10px;border-radius:var(--r-pill);white-space:nowrap}
 .b-wait{background:rgba(232,160,32,.15);color:#8a5d05}
 .b-ok  {background:rgba(46,139,87,.15);color:#1f6b40}
 .b-done{background:var(--sand);color:var(--soft)}
@@ -89,19 +101,19 @@ input,textarea{caret-color:var(--shop)}
 
 /* ── حقول ─────────────────────────────────────────────── */
 .field{display:block;margin-bottom:16px}
-.field > span{display:block;font-size:12.5px;font-weight:700;margin-bottom:6px}
-.field > small{display:block;font-size:11.5px;color:var(--soft);margin-top:5px}
+.field > span{display:block;font-size:var(--fs-xs);font-weight:700;margin-bottom:6px}
+.field > small{display:block;font-size:var(--fs-2xs);color:var(--soft);margin-top:5px}
 .input,input[type=text],input[type=tel],input[type=search],input[type=number],input[type=password],select,textarea{
-  width:100%;background:var(--paper);border:1.5px solid var(--line);border-radius:5px;padding:10px 12px;
+  width:100%;background:var(--paper);border:1.5px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;
   transition:border-color .2s}
 .input:focus,input:focus,select:focus,textarea:focus{outline:none;border-color:var(--shop)}
 textarea{resize:vertical;min-height:88px;line-height:1.7}
-.err{color:var(--danger);font-size:12px;font-weight:700;margin-top:6px}
-.hint-ok{color:var(--ok);font-size:12px;font-weight:700;margin-top:6px}
+.err{color:var(--danger);font-size:var(--fs-xs);font-weight:700;margin-top:6px}
+.hint-ok{color:var(--ok);font-size:var(--fs-xs);font-weight:700;margin-top:6px}
 
 /* ── إشعار عابر ───────────────────────────────────────── */
 .toast{position:fixed;bottom:24px;inset-inline-start:24px;z-index:200;background:var(--ink);color:var(--cream);
-  padding:12px 18px;border-radius:5px;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:9px;
+  padding:12px 18px;border-radius:var(--r-sm);font-size:var(--fs-sm);font-weight:700;display:flex;align-items:center;gap:9px;
   box-shadow:0 12px 32px -10px rgba(36,31,27,.5);opacity:0;transform:translateY(14px);pointer-events:none;
   transition:opacity .3s,transform .3s var(--ease);max-width:min(420px,calc(100vw - 48px))}
 .toast.on{opacity:1;transform:none}
@@ -109,12 +121,12 @@ textarea{resize:vertical;min-height:88px;line-height:1.7}
 
 /* ── شريط «عرض المزيد» أسفل القوائم المُرقَّمة ─────────── */
 .more-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;padding:22px 0 6px}
-.more-wrap small{color:var(--soft);font-size:12px}
+.more-wrap small{color:var(--soft);font-size:var(--fs-xs)}
 .more-wrap .btn{min-width:150px}
 
 /* ── حالات فارغة ──────────────────────────────────────── */
 .empty{text-align:center;padding:52px 20px;color:var(--soft)}
-.empty p{margin-top:12px;font-size:13.5px;line-height:1.9}
+.empty p{margin-top:12px;font-size:var(--fs-sm);line-height:1.9}
 .empty svg{margin:0 auto}
 
 /* ── طبقة تعتيم ونوافذ ────────────────────────────────── */
@@ -132,7 +144,7 @@ textarea{resize:vertical;min-height:88px;line-height:1.7}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 .skel{background:linear-gradient(90deg,var(--sand) 25%,var(--line) 37%,var(--sand) 63%);
-  background-size:400% 100%;animation:sk 1.3s ease infinite;border-radius:4px}
+  background-size:400% 100%;animation:sk 1.3s ease infinite;border-radius:var(--r-sm)}
 @keyframes sk{0%{background-position:100% 0}100%{background-position:0 0}}
 
 @media(prefers-reduced-motion:reduce){

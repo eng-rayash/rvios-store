@@ -26,7 +26,7 @@ const SECTORS = [
 $('#cards').innerHTML = SECTORS.map((s, i) => `
   <article class="card rv sector-card" data-d="${(i % 6) + 1}">
     <div class="sector-shot">
-      <img src="/assets/img/sectors/${s.id}.png" alt="${escapeHtml(s.n)}" loading="lazy" decoding="async">
+      <img src="/assets/img/sectors/${s.id}.jpg" alt="${escapeHtml(s.n)}" loading="lazy" decoding="async">
     </div>
     <div class="sector-body">
       <h3>${escapeHtml(s.n)}</h3>

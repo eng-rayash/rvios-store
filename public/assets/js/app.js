@@ -183,6 +183,29 @@ export const store = {
   },
 };
 
+/**
+ * بطاقة باقة واحدة — تستعملها الرئيسية و/pricing معاً.
+ *
+ * كانتا نسختين متطابقتين في ملفين، فحين تغيّر تصميم البطاقة
+ * تحرّكت واحدة وبقيت الأخرى: صفحة الباقات ظهرت بلا حدود ولا
+ * خلفية. قالب واحد يمنع تكرار ذلك.
+ */
+export function planCard(p, i, { reveal = false } = {}) {
+  const featured = i === 1;
+  return `
+    <div class="pcard card-s${featured ? ' feat' : ''}${reveal ? ' rv' : ''}"${reveal ? ` data-d="${i + 1}"` : ''}>
+      <div class="ptag">${featured ? 'الأكثر اختياراً' : '&nbsp;'}</div>
+      <h3>${escapeHtml(p.name)}</h3>
+      <div class="pdesc">${escapeHtml(p.desc)}</div>
+      <div class="pnum">${p.price === 0 ? 'مجانية' : p.price === null ? '—' : AR(p.price)}${
+        p.price === null ? '<span> / شهرياً</span>' : p.price ? '<span> ر.ي / شهرياً</span>' : ''}</div>
+      <ul>${p.features.map((ft) => `<li>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
+        ${escapeHtml(ft)}</li>`).join('')}</ul>
+      <a href="/onboarding" class="pbtn">${p.price === 0 ? 'ابدأ مجاناً' : 'اطلب الباقة'}</a>
+    </div>`;
+}
+
 /** تاريخ مقروء بالعربية */
 export function when(iso) {
   const d = new Date(iso);

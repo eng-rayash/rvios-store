@@ -28,6 +28,7 @@
     </a>
     <nav class="site-nav">
       <a href="/#steps">كيف يعمل</a>
+      <a href="/#features">المزايا</a>
       <a href="/sectors">القطاعات</a>
       <a href="/pricing">الباقات</a>
       <a href="/about">عن المنصة</a>
@@ -40,7 +41,7 @@
   </div>
 </header>
 
-<div class="wrap" style="padding:60px 0 90px;display:grid;grid-template-columns:1.1fr 1fr;gap:56px;align-items:start" id="grid">
+<div class="wrap contact-grid" id="grid">
   <div>
     <div class="kick">تواصل معنا</div>
     <h1 style="font-family:var(--display);font-size:clamp(32px,5vw,48px);font-weight:700;line-height:1.2;margin:13px 0 12px">
@@ -64,7 +65,7 @@
       <label class="field">
         <span>رقم واتساب</span>
         <div style="display:flex;align-items:center;background:var(--paper);border:1.5px solid var(--line);border-radius:5px;overflow:hidden">
-          <span style="padding:10px 12px;background:var(--sand);color:var(--soft);font-size:13px;direction:ltr">+967</span>
+          <span class="prefix">+967</span>
           <input type="tel" id="contact" inputmode="numeric" placeholder="٧٧٧ ١٢٣ ٤٥٦" style="border:none">
         </div>
       </label>
@@ -78,9 +79,9 @@
       <button class="btn btn-fill" id="send" type="submit">أرسل الطلب</button>
     </form>
 
-    <div id="done" hidden style="text-align:center;padding:40px 20px">
+    <div id="done" hidden class="form-done">
       <div style="width:70px;height:70px;border-radius:50%;background:rgba(46,139,87,.14);display:grid;place-items:center;margin:0 auto 18px">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
       </div>
       <h2 style="font-family:var(--display);font-size:30px;font-weight:700">وصلنا طلبك</h2>
       <p style="color:var(--soft);margin-top:10px;line-height:1.9">سنتواصل معك عبر واتساب قريباً.</p>
@@ -95,15 +96,15 @@
         يتولى فريقنا رفع منتجاتك وكتابة أوصافها وضبط هويتك البصرية كاملة،
         وتستلم متجراً جاهزاً للمشاركة في اليوم نفسه.
       </p>
-      <ul style="margin-top:16px">
-        <li style="display:flex;gap:9px;padding:6px 0;font-size:13.5px">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
+      <ul class="info-list">
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
           رفع المنتجات وتنظيمها في تصنيفات</li>
-        <li style="display:flex;gap:9px;padding:6px 0;font-size:13.5px">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
           ضبط الشعار والألوان وصورة الغلاف</li>
-        <li style="display:flex;gap:9px;padding:6px 0;font-size:13.5px">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.6" style="flex-shrink:0;margin-top:4px"><path d="M20 6 9 17l-5-5"/></svg>
           تدريب قصير على إدارة الطلبات</li>
       </ul>
       <p style="font-size:12.5px;color:var(--soft);margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
@@ -111,7 +112,7 @@
       </p>
     </div>
 
-    <div class="card" style="padding:22px;margin-top:18px">
+    <div class="card sec-card">
       <h4 style="font-size:14px;font-weight:800;margin-bottom:10px">هل تريد البدء بنفسك؟</h4>
       <p style="font-size:13px;color:var(--soft);line-height:1.9;margin-bottom:14px">
         الإعداد لا يستغرق أكثر من بضع دقائق، ولا يحتاج أي خبرة تقنية.

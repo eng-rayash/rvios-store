@@ -1,5 +1,5 @@
 // سكربت صفحة /pricing — أُخرج من HTML ليعمل مع CSP الصارم
-import { $, $$, api, AR, escapeHtml } from '/assets/js/app.js';
+import { $, $$, api, AR, escapeHtml, planCard } from '/assets/js/app.js';
 import '/assets/js/site.js';
 
 const FEATURES = [
@@ -27,18 +27,7 @@ const NO  = '<span style="color:var(--line);font-size:18px">—</span>';
 
 const plans = await api.get('/api/plans');
 
-$('#prow').innerHTML = plans.map((p, i) => `
-  <div class="pcard ${i === 1 ? 'feat' : ''}">
-    ${i === 1 ? '<div class="ptag">الأكثر اختياراً</div>' : '<div class="ptag">&nbsp;</div>'}
-    <h3>${escapeHtml(p.name)}</h3>
-    <div class="pdesc">${escapeHtml(p.desc)}</div>
-    <div class="pnum">${p.price === 0 ? 'مجانية' : p.price === null ? '—' : AR(p.price)}
-      ${p.price === null ? '<span> / شهرياً</span>' : p.price ? '<span> ر.ي / شهرياً</span>' : ''}</div>
-    <ul>${p.features.map((f) => `<li>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2E8B57" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>
-      ${escapeHtml(f)}</li>`).join('')}</ul>
-    <a href="/onboarding" class="pbtn">${p.price === 0 ? 'ابدأ مجاناً' : 'اطلب الباقة'}</a>
-  </div>`).join('');
+$('#prow').innerHTML = plans.map((pl, k) => planCard(pl, k)).join('');
 
 $('#cmp').innerHTML = `
   <thead><tr>
