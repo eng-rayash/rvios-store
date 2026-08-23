@@ -53,16 +53,6 @@ if (bar) {
   paint();
 }
 
-// ── حركة اللوحة المعلّقة ─────────────────────────────────
-const sign = $('.sign');
-if (sign && !matchMedia('(prefers-reduced-motion: reduce)').matches && matchMedia('(min-width: 900px)').matches) {
-  addEventListener('mousemove', (e) => {
-    const x = (e.clientX / innerWidth - .5) * 14;
-    const y = (e.clientY / innerHeight - .5) * 8;
-    sign.style.translate = `${x}px ${y}px`;
-  }, { passive: true });
-}
-
 // ── قائمة الجوال ─────────────────────────────────────────
 $('#burger')?.addEventListener('click', (e) => {
   const nav = $('.site-nav');
@@ -183,12 +173,8 @@ if (mtrack) {
     const cards = stores.map(card).join('');
     mtrack.innerHTML = cards + cards;
 
-    // اسم اللوحة في الهيرو يعرض متجراً حقيقياً إن وُجد
+    // أول متجر موثّق يقود المشهد؛ وإن لم يوجد فأحدثها
     const first = stores.find((s) => s.verified) ?? stores[0];
-    if (first && $('#signName')) {
-      $('#signName').textContent = first.name;
-      $('#signSlug').textContent = first.slug;
-    }
 
     // المشهد في الهيرو: الجهازان يعرضان **متجرين مختلفين**،
     // ولكلٍّ لوحته اللونية كاملة. هذا برهان بصري على أن اللون
@@ -203,7 +189,7 @@ const prow = $('#prow');
 if (prow) {
   api.get('/api/plans').then((plans) => {
     prow.innerHTML = plans.map((p, i) => `
-      <div class="pcard ${i === 1 ? 'feat' : ''} rv" data-d="${i + 1}">
+      <div class="pcard card-s ${i === 1 ? "feat" : ""} rv" data-d="${i + 1}">
         ${i === 1 ? '<div class="ptag">الأكثر اختياراً</div>' : '<div class="ptag">&nbsp;</div>'}
         <h3>${escapeHtml(p.name)}</h3>
         <div class="pdesc">${escapeHtml(p.desc)}</div>
