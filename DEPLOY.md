@@ -266,7 +266,7 @@ npm run restore -- --latest
 
 ```bash
 npm run readiness     # تدقيق ذاتي: أمان · منتج · ما لم يُبنَ
-npm test              # ٣٠٩ تأكيدات
+npm test              # ٣٥٩ تأكيداً في إحدى عشرة حزمة
 ```
 
 قائمة يدوية:
