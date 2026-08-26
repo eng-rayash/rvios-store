@@ -26,7 +26,7 @@ export default async function register(r) {
 
   // ── نظرة عامة (§٣.٣ — الطلبات المعلّقة أولاً) ──────────
   r.get('/api/me/overview', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
 
     const productCount = await s.count('products', {});
@@ -49,11 +49,11 @@ export default async function register(r) {
     const orderMap = Object.fromEntries(ordersByDay.map((o) => [o.d, o.n]));
 
     const monthStart = new Date().toISOString().slice(0, 7);
-    const confirmed = await s.raw(
+    const confirmed = (await s.raw(
       `SELECT COALESCE(SUM(total),0) sum FROM orders
        WHERE store_id = ? AND status IN ('ok','done') AND substr(created_at,1,7) = ?`,
       [store.id, monthStart],
-    )[0].sum;
+    ))[0].sum;
 
     json(res, {
       store: publicStore(store),
@@ -70,8 +70,10 @@ export default async function register(r) {
         label: capacityLabel(store, productCount),
         pct: plan.products === Infinity ? 0 : Math.min(100, Math.round((productCount / plan.products) * 100)),
       },
-      recent: await s.all('orders', {}, { order: 'created_at DESC', limit: 4 })
-               .map((o) => withItems(store.id, o)),
+      recent: await Promise.all(
+        (await s.all('orders', {}, { order: 'created_at DESC', limit: 4 }))
+          .map((o) => withItems(store.id, o)),
+      ),
     });
   });
 
@@ -85,7 +87,7 @@ export default async function register(r) {
   const ORDERS_PER_PAGE = 50;
 
   r.get('/api/me/orders', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
 
     const status = req.query.get('status');
@@ -103,10 +105,10 @@ export default async function register(r) {
     });
 
     json(res, {
-      orders: rows.map((o) => {
-        const full = withItems(store.id, o);
+      orders: await Promise.all(rows.map(async (o) => {
+        const full = await withItems(store.id, o);
         return { ...full, wa: waLink(store, full) };
-      }),
+      })),
       page,
       pages,
       total,
@@ -119,26 +121,26 @@ export default async function register(r) {
   });
 
   r.patch('/api/me/orders/:id', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const { status } = await readBody(req);
-    const updated = advance(store.id, toInt(req.params.id), status);
-    json(res, { ok: true, order: withItems(store.id, updated) });
+    const updated = await advance(store.id, toInt(req.params.id), status);
+    json(res, { ok: true, order: await withItems(store.id, updated) });
   });
 
   // ── المنتجات ──────────────────────────────────────────
   r.get('/api/me/products', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
     const products = await s.all('products', {}, { order: 'sort, id DESC' });
     const cats = await s.all('categories', {}, { order: 'sort, id' });
     const catName = Object.fromEntries(cats.map((c) => [c.id, c.name]));
     const plan = planOf(store);
     json(res, {
-      products: products.map((p) => ({
+      products: await Promise.all(products.map(async (p) => ({
         ...p,
         categoryName: catName[p.category_id] ?? '',
-        images: galleryOf(s, p),
-      })),
+        images: await galleryOf(s, p),
+      }))),
       capacity: {
         used: products.length,
         max: plan.products === Infinity ? null : plan.products,
@@ -150,7 +152,7 @@ export default async function register(r) {
   });
 
   r.post('/api/me/products', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
 
     // §٢.٢ — حدّ الباقة يُفرض في الخادم لا في الواجهة
@@ -161,24 +163,24 @@ export default async function register(r) {
     }
 
     const body = await readBody(req);
-    const id = await s.insert('products', productFields(body, s, true));
-    applyGallery(s, store, id, body);
-    json(res, { ok: true, product: withGallery(s, await s.get('products', { id })) }, 201);
+    const id = await s.insert('products', await productFields(body, s, true));
+    await applyGallery(s, store, id, body);
+    json(res, { ok: true, product: await withGallery(s, await s.get('products', { id })) }, 201);
   });
 
   r.patch('/api/me/products/:id', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
     const id = toInt(req.params.id);
     if (!await s.get('products', { id })) notFound('المنتج غير موجود');
     const body = await readBody(req);
-    await s.update('products', id, productFields(body, s, false));
-    applyGallery(s, store, id, body);
-    json(res, { ok: true, product: withGallery(s, await s.get('products', { id })) });
+    await s.update('products', id, await productFields(body, s, false));
+    await applyGallery(s, store, id, body);
+    json(res, { ok: true, product: await withGallery(s, await s.get('products', { id })) });
   });
 
   r.delete('/api/me/products/:id', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const n = await scope(store.id).remove('products', toInt(req.params.id));
     if (!n) notFound('المنتج غير موجود');
     json(res, { ok: true });
@@ -186,7 +188,7 @@ export default async function register(r) {
 
   // ── التصنيفات ─────────────────────────────────────────
   r.get('/api/me/categories', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
     const cats = await s.all('categories', {}, { order: 'sort, id' });
     json(res, await Promise.all(
@@ -195,7 +197,7 @@ export default async function register(r) {
   });
 
   r.post('/api/me/categories', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
     const body = await readBody(req);
     const name = clean(body.name, 40);
@@ -218,7 +220,7 @@ export default async function register(r) {
   });
 
   r.patch('/api/me/categories/:id', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
     const id = toInt(req.params.id);
     if (!await s.get('categories', { id })) notFound('التصنيف غير موجود');
@@ -231,7 +233,7 @@ export default async function register(r) {
   });
 
   r.delete('/api/me/categories/:id', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const n = await scope(store.id).remove('categories', toInt(req.params.id));
     if (!n) notFound('التصنيف غير موجود');
     json(res, { ok: true });
@@ -239,7 +241,7 @@ export default async function register(r) {
 
   // ── إعدادات المتجر (§٣.٣) ─────────────────────────────
   r.get('/api/me/store', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     json(res, {
       store: publicStore(store),
       plan: planOf(store),
@@ -249,7 +251,7 @@ export default async function register(r) {
   });
 
   r.patch('/api/me/store', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const body = await readBody(req);
     const patch = {};
 
@@ -259,10 +261,10 @@ export default async function register(r) {
     if (body.city    !== undefined) patch.city    = clean(body.city, 40);
     if (body.address !== undefined) patch.address = clean(body.address, 120);
     if (body.hours   !== undefined) patch.hours   = clean(body.hours, 120);
-    if (body.logo    !== undefined) patch.logo    = saveImage(store.id, 'logo', body.logo);
-    if (body.banner  !== undefined) patch.banner  = saveImage(store.id, 'banner', body.banner);
+    if (body.logo    !== undefined) patch.logo    = await saveImage(store.id, 'logo', body.logo);
+    if (body.banner  !== undefined) patch.banner  = await saveImage(store.id, 'banner', body.banner);
     // §٣.٤ — صورة العرض: ثانية غير الغلاف، تعيش في «قصة المتجر»
-    if (body.showcase !== undefined) patch.showcase = saveImage(store.id, 'showcase', body.showcase);
+    if (body.showcase !== undefined) patch.showcase = await saveImage(store.id, 'showcase', body.showcase);
     if (body.sector  !== undefined) patch.sector  = clean(body.sector, 30);
 
     if (body.color     !== undefined && HEX.test(body.color))     patch.color = body.color;
@@ -291,7 +293,7 @@ export default async function register(r) {
     }
 
     if (body.slug !== undefined && body.slug !== store.slug) {
-      const check = checkSlug(body.slug, store.id);
+      const check = await checkSlug(body.slug, store.id);
       if (!check.ok) bad(check.reason);
       patch.slug = check.slug;
     }
@@ -315,15 +317,16 @@ export default async function register(r) {
 
   // ── الاشتراك (§٣.٣) ───────────────────────────────────
   r.get('/api/me/plan', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
     const used = await s.count('products', {});
+    const prices = await planPrices();
     json(res, {
       current: planOf(store),
       all: Object.values(PLANS).map((p) => ({
         ...p,
         products: p.products === Infinity ? null : p.products,
-        price: planPrices()[p.id] ?? null,     // بالريال، من الإعدادات
+        price: prices[p.id] ?? null,     // بالريال، من الإعدادات
       })),
       addons: ADDONS,
       capacity: { used, label: capacityLabel(store, used) },
@@ -333,7 +336,7 @@ export default async function register(r) {
 
   /** طلب خدمة إضافية أو توثيق — يذهب لطابور الإدارة (§٣.٥) */
   r.post('/api/me/requests', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const body = await readBody(req);
     const kind = clean(body.kind, 20);
     if (!['build', 'domain', 'store', 'verify', 'upgrade'].includes(kind)) bad('نوع الطلب غير معروف');
@@ -353,65 +356,65 @@ export default async function register(r) {
   });
 
   r.get('/api/me/requests', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     json(res, await scope(store.id).all('service_requests', {}, { order: 'created_at DESC' }));
   });
 
   // ═══ الفوترة (§٥) ═════════════════════════════════════
   r.get('/api/me/billing', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const s = scope(store.id);
     const plan = planOf(store);
     const used = await s.count('products', {});
 
     json(res, {
-      subscription: subscriptionOf(store),
-      prices: planPrices(),
-      addons: addonPrices(),
-      methods: paymentMethods(),
-      yearlyMonthsFree: YEARLY_MONTHS_FREE(),
+      subscription: await subscriptionOf(store),
+      prices: await planPrices(),
+      addons: await addonPrices(),
+      methods: await paymentMethods(),
+      yearlyMonthsFree: await YEARLY_MONTHS_FREE(),
       invoices: await s.all('invoices', {}, { order: 'created_at DESC', limit: 50 }),
       // §٥.٥ — كم منتجاً مخفي بسبب حد الباقة (مخفي لا محذوف)
-      hidden: hiddenByPlanCount(store, plan.products),
+      hidden: await hiddenByPlanCount(store, plan.products),
       products: { used, limit: plan.products === Infinity ? null : plan.products },
     });
   });
 
   /** ترقية → فاتورة بمرجع وتعليمات تحويل */
   r.post('/api/me/billing/invoices', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const body = await readBody(req);
-    const invoice = createInvoice(store.id, {
+    const invoice = await createInvoice(store.id, {
       kind: clean(body.kind, 20) || 'subscription',
       plan: clean(body.plan, 10) || null,
       months: Math.max(1, Math.min(24, toInt(body.months, 1))),
     });
-    json(res, { ok: true, invoice, methods: paymentMethods() }, 201);
+    json(res, { ok: true, invoice, methods: await paymentMethods() }, 201);
   });
 
   /** رفع الإيصال → مراجعة + تفعيل فوري (§٥.٣) */
   r.post('/api/me/billing/invoices/:id/proof', async (req, res) => {
-    const { store } = requireStore(req);
+    const { store } = await requireStore(req);
     const body = await readBody(req);
-    const proofKey = saveImage(store.id, 'receipts', body.proof);
-    const invoice = submitProof(store.id, toInt(req.params.id), {
+    const proofKey = await saveImage(store.id, 'receipts', body.proof);
+    const invoice = await submitProof(store.id, toInt(req.params.id), {
       method: clean(body.method, 20),
       proofKey,
     });
     json(res, {
       ok: true,
       invoice,
-      subscription: subscriptionOf(await db.prepare('SELECT * FROM stores WHERE id = ?').get(store.id)),
+      subscription: await subscriptionOf(await db.prepare('SELECT * FROM stores WHERE id = ?').get(store.id)),
       message: 'وصلنا إيصالك وفُعّلت باقتك فوراً. سنراجعه خلال يوم عمل.',
     });
   });
 
   // ═══ المتاجر المتعددة (برو) ═══════════════════════════
   r.get('/api/me/stores', async (req, res) => {
-    const { merchant, store, stores } = requireStore(req);
+    const { merchant, store, stores } = await requireStore(req);
     json(res, {
       active: store.id,
-      slots: slotsOf(merchant),
+      slots: await slotsOf(merchant),
       stores: stores.map((s) => ({
         id: s.id, slug: s.slug, name: s.name, logo: s.logo,
         color: s.color, plan: s.plan, status: s.status, url: `/${s.slug}`,
@@ -421,16 +424,16 @@ export default async function register(r) {
 
   /** يثبّت المتجر النشط على الجلسة */
   r.post('/api/me/active-store', async (req, res) => {
-    const { merchant } = requireStore(req);
+    const { merchant } = await requireStore(req);
     const body = await readBody(req);
     const wanted = clean(body.store, 40);
 
-    const target = storesOf(merchant.id)
+    const target = (await storesOf(merchant.id))
       .find((s) => s.slug === wanted || String(s.id) === wanted);
     if (!target) notFound('لا تملك متجراً بهذا الرابط');
     if (target.status === 'suspended') bad('هذا المتجر موقوف — تواصل مع الدعم');
 
-    setActiveStore(req, target.id);
+    await setActiveStore(req, target.id);
     json(res, { ok: true, store: publicStore(target) });
   });
 
@@ -439,30 +442,30 @@ export default async function register(r) {
    * التأكيد برابط هذا المتجر بالذات.
    */
   r.delete('/api/me/stores/:id', async (req, res) => {
-    const { merchant } = requireStore(req);
+    const { merchant } = await requireStore(req);
     const body = await readBody(req);
     const id = toInt(req.params.id);
 
-    const target = storesOf(merchant.id).find((s) => s.id === id);
+    const target = (await storesOf(merchant.id)).find((s) => s.id === id);
     if (!target) notFound('لا تملك متجراً بهذا المعرّف');
     if (clean(body.confirm, 40) !== target.slug) {
       bad(`اكتب «${target.slug}» بالضبط لتأكيد حذف هذا المتجر`, 'CONFIRM_MISMATCH');
     }
 
-    const remaining = storesOf(merchant.id).length - 1;
+    const remaining = (await storesOf(merchant.id)).length - 1;
     if (remaining < 1) {
       bad('لا يمكن حذف متجرك الوحيد — احذف الحساب بدلاً من ذلك', 'LAST_STORE');
     }
 
     await db.prepare('DELETE FROM stores WHERE id = ? AND merchant_id = ?').run(id, merchant.id);
-    dropStoreImages(id);
+    await dropStoreImages(id);
     json(res, { ok: true, message: `حُذف متجر «${target.name}»` });
   });
 
   // ── حذف الحساب (سياسة الخصوصية §٤ تعد به) ─────────────
   //  يُطلب كتابة رابط المتجر حرفياً — فعل لا رجعة فيه.
   r.delete('/api/me/account', async (req, res) => {
-    const { merchant, stores } = requireStore(req);
+    const { merchant, stores } = await requireStore(req);
     const body = await readBody(req);
 
     /**
@@ -476,8 +479,8 @@ export default async function register(r) {
           'CONFIRM_MISMATCH');
     }
 
-    const storeIds = db.prepare('SELECT id FROM stores WHERE merchant_id = ?')
-      .all(merchant.id).map((s) => s.id);
+    const storeIds = (await db.prepare('SELECT id FROM stores WHERE merchant_id = ?')
+      .all(merchant.id)).map((s) => s.id);
 
     // الحذف بترتيب يحترم المفاتيح الأجنبية؛ ON DELETE CASCADE يتكفّل بالتوابع
     await db.transaction(async (tx) => {
@@ -487,7 +490,7 @@ export default async function register(r) {
       await tx.prepare('DELETE FROM merchants WHERE id = ?').run(merchant.id);
     });
 
-    for (const id of storeIds) dropStoreImages(id);
+    for (const id of storeIds) await dropStoreImages(id);
 
     json(res, { ok: true, message: 'حُذف حسابك وكل بياناته' }, 200, {
       'set-cookie': cookieHeader(SESSION_COOKIE, '', { clear: true }),
@@ -501,13 +504,13 @@ export default async function register(r) {
 async function applyGallery(s, store, productId, body) {
   if (body.images === undefined) return;
   const max = planOf(store).imagesPerProduct;
-  const cover = syncGallery(s, productId, body.images, max);
+  const cover = await syncGallery(s, productId, body.images, max);
   await s.update('products', productId, { image: cover });
 }
 
 /** يضيف مصفوفة الصور إلى صف المنتج */
-function withGallery(s, product) {
-  return { ...product, images: galleryOf(s, product) };
+async function withGallery(s, product) {
+  return { ...product, images: await galleryOf(s, product) };
 }
 
 async function productFields(body, s, isNew) {
@@ -516,7 +519,7 @@ async function productFields(body, s, isNew) {
   if (body.summary     !== undefined) f.summary     = clean(body.summary, 120);
   if (body.description !== undefined) f.description = clean(body.description, 1200);
   if (body.variant     !== undefined) f.variant     = clean(body.variant, 40);
-  if (body.image       !== undefined) f.image       = saveImage(s.storeId, 'products', body.image);
+  if (body.image       !== undefined) f.image       = await saveImage(s.storeId, 'products', body.image);
   if (body.price       !== undefined) f.price       = Math.max(0, toInt(body.price));
   if (body.qty         !== undefined) f.qty         = Math.max(0, toInt(body.qty));
   if (body.live        !== undefined) f.live        = body.live ? 1 : 0;

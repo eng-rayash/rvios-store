@@ -26,8 +26,12 @@ services:
     autoDeploy: true
 
     # ── قرص دائم ──────────────────────────────────────────
-    # القاعدة خارجية، لكن **صور المتاجر** ملفات على القرص.
-    # بلا هذا القرص تُمحى كل صورة رفعها تاجر مع أول إعادة نشر.
+    # يلزم فقط مع STORAGE_DRIVER=local: صور المتاجر عندها
+    # ملفات، وبلا قرص دائم تُمحى مع أول إعادة نشر.
+    #
+    # مع STORAGE_DRIVER=r2 يصير التطبيق بلا حالة: احذف هذه
+    # الكتلة الأربع الأسطر، ووفّر خمسة غيغابايت وحدّ النسخة
+    # الواحدة (القرص الدائم يمنع تعدّد النسخ على Render).
     disk:
       name: rvios-data
       mountPath: /data
@@ -53,6 +57,24 @@ services:
       # ونحن ننسخ الصور. pg_dump متاح في الصورة.
       - key: BACKUP_ENABLED
         value: "1"
+
+      # ── تخزين الصور ──
+      # للانتقال إلى Cloudflare R2: اجعل القيمة r2، واملأ
+      # المفاتيح الأربعة من لوحة Render، ثم احذف كتلة القرص
+      # أعلاه. القيم القديمة في القاعدة (/uploads/…) تبقى
+      # صالحة — لا ترحيل إجباري.
+      - key: STORAGE_DRIVER
+        value: local
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
 
       # ── أسرار: تُملأ من لوحة Render، لا من هذا الملف ──
       - key: RVIOS_ADMIN_PASS

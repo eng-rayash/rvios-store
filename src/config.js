@@ -174,6 +174,27 @@ export const config = {
     maxBodyBytes: int('MAX_BODY_BYTES', 6 * 1024 * 1024, { min: 64 * 1024 }),
   },
 
+  /**
+   * أين تُخزَّن صور المتاجر.
+   *
+   * ‏local: القرص — يحتاج قرصاً دائماً على منصة النشر وإلا
+   *        اختفت الصور مع كل إصدار جديد.
+   * ‏r2:    Cloudflare R2 — يجعل التطبيق بلا حالة، فيصير
+   *        التوسّع أفقياً وإعادة النشر بلا أثر على الصور.
+   */
+  storage: {
+    driver: oneOf('STORAGE_DRIVER', ['local', 'r2'], 'local'),
+    r2: {
+      accountId: env.R2_ACCOUNT_ID ?? '',
+      accessKeyId: env.R2_ACCESS_KEY_ID ?? '',
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY ?? '',
+      bucket: env.R2_BUCKET ?? '',
+      // عنوان السلة العام (نطاق مخصّص أو r2.dev). بدونه تبقى
+      // السلة خاصة ويمرّ الخادم بالصور بنفسه.
+      publicUrl: (env.R2_PUBLIC_URL ?? '').replace(/\/$/, ''),
+    },
+  },
+
   jobs: {
     enabled: bool('JOBS_ENABLED', true),
     intervalMs: int('JOBS_INTERVAL_MS', 5000, { min: 500, max: 300000 }),
@@ -245,6 +266,17 @@ if (otpChain.includes('whatsapp') && (!config.whatsapp.token || !config.whatsapp
 }
 if (otpChain.includes('sms') && !config.sms.url) {
   errors.push('قناة sms تتطلب SMS_URL');
+}
+// التخزين السحابي: إعداد ناقص يعني رفعاً يفشل بعد أن يظنّ
+// التاجر أن صورته حُفظت — نوقف الإقلاع بدل ذلك
+if (config.storage.driver === 'r2') {
+  const r2 = config.storage.r2;
+  const missing = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET']
+    .filter((k) => !env[k]);
+  if (missing.length) errors.push(`STORAGE_DRIVER=r2 يتطلب: ${missing.join(' · ')}`);
+  if (!r2.publicUrl) {
+    warnings.push('R2_PUBLIC_URL غير مضبوط — الصور ستمرّ عبر الخادم بدل شبكة Cloudflare');
+  }
 }
 if (config.whatsapp.token && !config.meta.appSecret) {
   warnings.push('META_APP_SECRET غير مضبوط — لن نتمكّن من توقيع الطلبات (appsecret_proof) ولا التحقق من الـWebhook');

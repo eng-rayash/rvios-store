@@ -52,6 +52,14 @@ services:
       WA_VERIFY_TOKEN: ${WA_VERIFY_TOKEN:-}
       META_APP_SECRET: ${META_APP_SECRET:-}
       BACKUP_ENABLED: ${BACKUP_ENABLED:-1}
+      # التخزين: local افتراضاً (المجلّد المربوط أدناه).
+      # مع r2 تصير الصور على Cloudflare ويُستغنى عن الربط.
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
     volumes:
       # الصور المرفوعة والنسخ — تنجو من استبدال الحاوية
       - appdata:/data

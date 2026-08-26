@@ -124,19 +124,19 @@ export const SECURITY_HEADERS = {
 };
 
 // ── حد المعدل (§٦.٢: يمنع حسابات وهمية) ──────────────────
-export function rateLimit(key, { max = 5, windowMs = 60_000 } = {}) {
+export async function rateLimit(key, { max = 5, windowMs = 60_000 } = {}) {
   const reset = new Date(Date.now() + windowMs).toISOString();
-  const row = db.prepare('SELECT * FROM rate_limits WHERE key = ?').get(key);
+  const row = await db.prepare('SELECT * FROM rate_limits WHERE key = ?').get(key);
 
   if (!row || row.reset_at < now()) {
-    db.prepare(`INSERT INTO rate_limits (key, count, reset_at) VALUES (?, 1, ?)
+    await db.prepare(`INSERT INTO rate_limits (key, count, reset_at) VALUES (?, 1, ?)
                 ON CONFLICT(key) DO UPDATE SET count = 1, reset_at = excluded.reset_at`).run(key, reset);
     return;
   }
   if (row.count >= max) {
     throw new HttpError(429, 'محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة');
   }
-  db.prepare('UPDATE rate_limits SET count = count + 1 WHERE key = ?').run(key);
+  await db.prepare('UPDATE rate_limits SET count = count + 1 WHERE key = ?').run(key);
 }
 
 export function clientIp(req) {

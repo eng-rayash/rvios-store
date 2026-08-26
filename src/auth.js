@@ -7,7 +7,7 @@
 //
 //  لا يوجد مزوّد SMS في هذه المرحلة: في وضع التطوير يُطبع
 //  الرمز في سجل الخادم ويُعاد في الرد. عند الإنتاج يُستبدل
-//  sendOtp() بمزوّد فعلي ولا يتغير شيء آخر.
+//  await sendOtp() بمزوّد فعلي ولا يتغير شيء آخر.
 // ═══════════════════════════════════════════════════════════
 import crypto from 'node:crypto';
 import { db, now } from './db.js';
@@ -70,10 +70,10 @@ function sameHash(a, b) {
   return crypto.timingSafeEqual(x, y);
 }
 
-export function issueOtp(phone) {
+export async function issueOtp(phone) {
   const code = String(crypto.randomInt(100000, 999999));
   const expires = new Date(Date.now() + OTP_TTL_MS).toISOString();
-  db.prepare(`INSERT INTO otps (phone, code, attempts, expires_at) VALUES (?, ?, 0, ?)
+  await db.prepare(`INSERT INTO otps (phone, code, attempts, expires_at) VALUES (?, ?, 0, ?)
               ON CONFLICT(phone) DO UPDATE SET code = excluded.code, attempts = 0, expires_at = excluded.expires_at`)
     .run(phone, hashCode(code), expires);
   return code;   // الخام يعود للإرسال فقط، ولا يُكتب في أي مكان
@@ -98,7 +98,7 @@ export async function assertResendAllowed(phone) {
 
 /** يرسل الرمز عبر المزوّد المضبوط (انظر src/notify.js) */
 export async function sendOtp(phone, code) {
-  return deliverOtp(phone, code);
+  return await deliverOtp(phone, code);
 }
 
 /**
@@ -133,22 +133,22 @@ export async function verifyOtp(phone, code) {
 export async function findOrCreateMerchant(phone) {
   const found = await db.prepare('SELECT * FROM merchants WHERE phone = ?').get(phone);
   if (found) return found;
-  const res = db.prepare('INSERT INTO merchants (phone, name, created_at) VALUES (?, ?, ?)')
+  const res = await db.prepare('INSERT INTO merchants (phone, name, created_at) VALUES (?, ?, ?)')
                 .run(phone, '', now());
   return await db.prepare('SELECT * FROM merchants WHERE id = ?').get(Number(res.lastInsertRowid));
 }
 
-export function createSession(merchantId, kind = 'merchant') {
+export async function createSession(merchantId, kind = 'merchant') {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare('INSERT INTO sessions (token, merchant_id, kind, created_at, expires_at) VALUES (?,?,?,?,?)')
+  await db.prepare('INSERT INTO sessions (token, merchant_id, kind, created_at, expires_at) VALUES (?,?,?,?,?)')
     .run(token, merchantId, kind, now(), new Date(Date.now() + SESSION_TTL_MS).toISOString());
   return token;
 }
 
 /** جلسة إدارة — لا ترتبط بتاجر، وعمرها أقصر */
-export function createAdminSession() {
+export async function createAdminSession() {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare('INSERT INTO sessions (token, merchant_id, kind, created_at, expires_at) VALUES (?,NULL,?,?,?)')
+  await db.prepare('INSERT INTO sessions (token, merchant_id, kind, created_at, expires_at) VALUES (?,NULL,?,?,?)')
     .run(token, 'admin', now(), new Date(Date.now() + 12 * 3600 * 1000).toISOString());
   return token;
 }
@@ -170,8 +170,8 @@ export async function currentMerchant(req) {
   return await db.prepare('SELECT * FROM merchants WHERE id = ?').get(s.merchant_id) ?? null;
 }
 
-export function requireMerchant(req) {
-  const m = currentMerchant(req);
+export async function requireMerchant(req) {
+  const m = await currentMerchant(req);
   if (!m) throw new HttpError(401, 'يلزم تسجيل الدخول');
   return m;
 }
@@ -207,13 +207,13 @@ export async function setActiveStore(req, storeId) {
  * متجر مطلوب لا يملكه التاجر يسقط بصمت إلى الافتراضي: لا نكشف
  * وجوده من عدمه، ولا نسمح بالوصول إليه.
  */
-export function requireStore(req) {
-  const m = requireMerchant(req);
-  const stores = storesOf(m.id);
+export async function requireStore(req) {
+  const m = await requireMerchant(req);
+  const stores = await storesOf(m.id);
   if (!stores.length) throw new HttpError(409, 'لم تُنشئ متجرك بعد', 'NO_STORE');
 
   const asked = req.headers?.['x-store'] ?? req.query?.get?.('store') ?? null;
-  const activeId = sessionActiveStore(req);
+  const activeId = await sessionActiveStore(req);
 
   const store =
     (asked && stores.find((s) => s.slug === asked || String(s.id) === String(asked)))
@@ -232,8 +232,8 @@ export async function isAdmin(req) {
   return !!s && s.expires_at >= now();
 }
 
-export function requireAdmin(req) {
-  if (!isAdmin(req)) throw new HttpError(401, 'يلزم دخول الإدارة');
+export async function requireAdmin(req) {
+  if (!await isAdmin(req)) throw new HttpError(401, 'يلزم دخول الإدارة');
 }
 
 export async function cleanupExpired() {

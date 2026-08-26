@@ -26,13 +26,13 @@ export async function storeBySlug(slug) {
   return s;
 }
 
-function shape(store, p, { gallery = false } = {}) {
+async function shape(store, p, { gallery = false } = {}) {
   return {
     id: p.id, name: p.name, summary: p.summary, description: p.description,
     variant: p.variant, price: p.price, oldPrice: p.old_price,
     qty: p.qty, image: p.image, categoryId: p.category_id,
     // المعرض يُجلب عند الحاجة فقط — الشبكة تكتفي بالغلاف
-    ...(gallery ? { images: galleryOf(scope(store.id), p) } : {}),
+    ...(gallery ? { images: await galleryOf(scope(store.id), p) } : {}),
     // §٣.٤ — مؤشر توفّر صادق بدل نجوم تقييم غير حقيقية
     stock: p.qty <= 0 ? 'none' : p.qty <= 5 ? 'low' : 'ok',
     stockLabel: p.qty <= 0 ? 'نفد المخزون'
@@ -48,7 +48,7 @@ const SORTS = {
   low:  'price ASC, id DESC',
   high: 'price DESC, id DESC',
   // COLLATE NOCASE لهجة SQLite؛ LOWER() المكافئ المحمول
-  name: 'LOWER(name) ASC',
+  name: 'LOWER(name) ASC, id DESC',
 };
 
 /**
@@ -94,14 +94,14 @@ async function queryProducts(store, query) {
   const clause = where.join(' AND ');
   const order = SORTS[query.get('sort')] ?? SORTS.new;
 
-  const total = await s.raw(`SELECT COUNT(*) n FROM products WHERE ${clause}`, params)[0].n;
+  const total = (await s.raw(`SELECT COUNT(*) n FROM products WHERE ${clause}`, params))[0].n;
   const rows = await s.raw(
     `SELECT * FROM products WHERE ${clause} ORDER BY ${order} LIMIT ? OFFSET ?`,
     [...params, per, (page - 1) * per],
   );
 
   return {
-    products: rows.map((p) => shape(store, p)),
+    products: await Promise.all(rows.map((p) => shape(store, p))),
     total,
     page,
     per,
@@ -116,7 +116,7 @@ export default async function register(r) {
   //  §٥.٣ — لا نُرسل كتالوجاً كاملاً على إنترنت بطيء:
   //  صفحة واحدة فقط، والبحث والفلترة يجريان في الخادم.
   r.get('/api/shop/:slug', async (req, res) => {
-    const store = storeBySlug(req.params.slug);
+    const store = await storeBySlug(req.params.slug);
     const s = scope(store.id);
 
     const cats = await s.all('categories', {}, { order: 'sort, id' });
@@ -132,29 +132,29 @@ export default async function register(r) {
         note: store.delivery_note ?? '',
       },
       categories: cats.map((c) => ({ id: c.id, name: c.name, parentId: c.parent_id, count: counts[c.id] ?? 0 })),
-      ...queryProducts(store, req.query),
+      ...await queryProducts(store, req.query),
     });
   });
 
   // ── صفحة منتجات إضافية / بحث ──────────────────────────
   r.get('/api/shop/:slug/products', async (req, res) => {
-    const store = storeBySlug(req.params.slug);
-    json(res, queryProducts(store, req.query));
+    const store = await storeBySlug(req.params.slug);
+    json(res, await queryProducts(store, req.query));
   });
 
   // ── منتج واحد — رابط قابل للمشاركة ────────────────────
   r.get('/api/shop/:slug/products/:id', async (req, res) => {
-    const store = storeBySlug(req.params.slug);
+    const store = await storeBySlug(req.params.slug);
     const p = await scope(store.id).get('products', { id: toInt(req.params.id), live: 1 });
     if (!p) notFound('المنتج غير موجود');
-    json(res, { store: publicStore(store), product: shape(store, p, { gallery: true }) });
+    json(res, { store: publicStore(store), product: await shape(store, p, { gallery: true }) });
   });
 
   // ── تسجيل زيارة (§١٠ — قياس) ──────────────────────────
   //  زوّار فريدون يومياً: بصمة مجزّأة تمنع تضخيم الرقم بكل
   //  تحديث للصفحة، بلا تخزين أي بيانات تعريفية.
   r.post('/api/shop/:slug/visit', async (req, res) => {
-    const store = storeBySlug(req.params.slug);
+    const store = await storeBySlug(req.params.slug);
     const day = today();
 
     const mark = crypto.createHash('sha256')
@@ -164,8 +164,8 @@ export default async function register(r) {
     const seen = await db.prepare('SELECT 1 FROM visit_marks WHERE mark = ?').get(mark);
     if (!seen) {
       await db.prepare('INSERT INTO visit_marks (mark, day) VALUES (?,?)').run(mark, day);
-      db.prepare(`INSERT INTO visits (store_id, day, count) VALUES (?,?,1)
-                  ON CONFLICT(store_id, day) DO UPDATE SET count = count + 1`)
+      await db.prepare(`INSERT INTO visits (store_id, day, count) VALUES (?,?,1)
+                  ON CONFLICT(store_id, day) DO UPDATE SET count = visits.count + 1`)
         .run(store.id, day);
     }
     json(res, { ok: true, counted: !seen });
@@ -174,11 +174,11 @@ export default async function register(r) {
   // ── إنشاء طلب (§٤.١) ──────────────────────────────────
   //  الطلب يُسجَّل هنا **قبل** أن يفتح العميل واتساب.
   r.post('/api/shop/:slug/orders', async (req, res) => {
-    const store = storeBySlug(req.params.slug);
-    rateLimit(`order:${clientIp(req)}:${store.id}`, { max: 10, windowMs: 10 * 60_000 });
+    const store = await storeBySlug(req.params.slug);
+    await rateLimit(`order:${clientIp(req)}:${store.id}`, { max: 10, windowMs: 10 * 60_000 });
 
     const body = await readBody(req);
-    const order = placeOrder(store.id, store, {
+    const order = await placeOrder(store.id, store, {
       lines:   body.lines,
       name:    clean(body.name, 60),
       phone:   clean(body.phone, 20),
@@ -186,7 +186,7 @@ export default async function register(r) {
       note:    clean(body.note, 300),
     });
 
-    const full = withItems(store.id, await scope(store.id).get('orders', { id: order.id }));
+    const full = await withItems(store.id, await scope(store.id).get('orders', { id: order.id }));
 
     // §٣.٣ — سرعة رد التاجر هي عنق الزجاجة، فلا نتركه ينتظر فتح اللوحة.
     // لا ننتظر النتيجة: الطلب مسجّل، والإشعار تحسين لا شرط.
@@ -205,10 +205,10 @@ export default async function register(r) {
 
   // ── متابعة طلب برقمه المرجعي ──────────────────────────
   r.get('/api/shop/:slug/orders/:ref', async (req, res) => {
-    const store = storeBySlug(req.params.slug);
+    const store = await storeBySlug(req.params.slug);
     const o = await scope(store.id).get('orders', { ref: req.params.ref.toUpperCase() });
     if (!o) notFound('لا يوجد طلب بهذا الرقم');
-    const full = withItems(store.id, o);
+    const full = await withItems(store.id, o);
     json(res, {
       ref: o.ref, status: o.status,
       subtotal: o.subtotal, deliveryFee: o.delivery_fee, total: o.total,
@@ -218,8 +218,8 @@ export default async function register(r) {
 
   // ── الإبلاغ عن متجر (§٦.٢ — صمام أمان من اليوم الأول) ──
   r.post('/api/shop/:slug/report', async (req, res) => {
-    const store = storeBySlug(req.params.slug);
-    rateLimit(`report:${clientIp(req)}`, { max: 5, windowMs: 60 * 60_000 });
+    const store = await storeBySlug(req.params.slug);
+    await rateLimit(`report:${clientIp(req)}`, { max: 5, windowMs: 60 * 60_000 });
 
     const body = await readBody(req);
     const reason = clean(body.reason, 60);
@@ -236,21 +236,21 @@ export default async function register(r) {
 
   // ── طلب خدمة من الموقع التسويقي (§٣.١ تواصل معنا) ─────
   r.post('/api/contact', async (req, res) => {
-    rateLimit(`contact:${clientIp(req)}`, { max: 5, windowMs: 60 * 60_000 });
+    await rateLimit(`contact:${clientIp(req)}`, { max: 5, windowMs: 60 * 60_000 });
     const body = await readBody(req);
     const kind = clean(body.kind, 20);
     if (!['build', 'domain', 'store', 'other'].includes(kind)) bad('نوع الطلب غير معروف');
     const contact = clean(body.contact, 60);
     if (!contact) bad('اترك رقم تواصل');
 
-    db.prepare('INSERT INTO service_requests (store_id, kind, contact, detail, status, created_at) VALUES (NULL,?,?,?,?,?)')
+    await db.prepare('INSERT INTO service_requests (store_id, kind, contact, detail, status, created_at) VALUES (NULL,?,?,?,?,?)')
       .run(kind, contact, clean(body.detail, 800), 'open', now());
     json(res, { ok: true, message: 'وصلنا طلبك — سنتواصل معك قريباً' }, 201);
   });
 
   // ── متاجر حقيقية للعرض في الصفحة الرئيسية (§٣.١) ──────
-  r.get('/api/showcase', (_req, res) => {
-    const rows = db.prepare(`
+  r.get('/api/showcase', async (_req, res) => {
+    const rows = await db.prepare(`
       SELECT s.slug, s.name, s.sector, s.logo, s.banner, s.color, s.verified, s.city,
              (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id AND p.live = 1) products
       FROM stores s

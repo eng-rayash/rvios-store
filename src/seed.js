@@ -247,7 +247,7 @@ await S2.insert('service_requests', {
   detail: 'أرغب بتوثيق المتجر — لدي سجل تجاري.',
   status: 'open', created_at: ago(2),
 });
-db.prepare('INSERT INTO service_requests (store_id, kind, contact, detail, status, created_at) VALUES (NULL,?,?,?,?,?)')
+await db.prepare('INSERT INTO service_requests (store_id, kind, contact, detail, status, created_at) VALUES (NULL,?,?,?,?,?)')
   .run('build', '739112233', 'أريد أن تنشئوا متجري — لدي ٤٠ منتجاً.', 'open', ago(1));
 
 console.log(`

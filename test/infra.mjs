@@ -83,22 +83,31 @@ const { backupNow, listBackups } = await import('../src/backup.js');
 const { config } = await import('../src/config.js');
 {
   const before = listBackups().length;
-  const info = backupNow('test');
-  ok(info.kb > 0, `النسخة أُنشئت (${info.kb}KB)`);
-  ok(info.stores > 0, 'النسخة تحوي متاجر فعلية');
-  // لا نعدّ الملفات: حين يبلغ المجلد حد الاستبقاء (BACKUP_KEEP)
-  // يحذف prune أقدم نسخة مع كل جديدة، فيبقى العدد ثابتاً بينما
-  // النسخ يعمل تماماً. المهم أن النسخة الجديدة **بعينها** ظهرت.
-  ok(listBackups().some((b) => b.file === info.file), `ظهرت في القائمة (${before} نسخة قبلها)`);
+  const info = await backupNow('test');
 
-  const file = path.join(config.paths.backups, info.file);
-  ok(fs.existsSync(file), 'الملف موجود على القرص');
+  // pg_dump أداة خارجية لا تأتي مع Node. غيابها حالة نشر
+  // مشروعة يعالجها backupNow بنسخ الصور وحدها، فنُعلنها
+  // تخطّياً صريحاً بدل فشل يُقرأ كعطب في النسخ الاحتياطي.
+  if (info.dbSkipped) {
+    console.log('  ⚠ pg_dump غير مثبّت — تُخطّى فحوص نسخ القاعدة الستّة.');
+    console.log('    ثبّت postgresql-client ثم أعد التشغيل لتغطيتها.');
+  } else {
+    ok(info.kb > 0, `النسخة أُنشئت (${info.kb}KB)`);
+    ok(info.stores > 0, 'النسخة تحوي متاجر فعلية');
+    // لا نعدّ الملفات: حين يبلغ المجلد حد الاستبقاء (BACKUP_KEEP)
+    // يحذف prune أقدم نسخة مع كل جديدة، فيبقى العدد ثابتاً بينما
+    // النسخ يعمل تماماً. المهم أن النسخة الجديدة **بعينها** ظهرت.
+    ok(listBackups().some((b) => b.file === info.file), `ظهرت في القائمة (${before} نسخة قبلها)`);
 
-  // التحقق يفتح النسخة فعلاً — نسخة لا تُفتح ليست نسخة
-  // نسخة pg_dump نصّية: نتحقّق من ختمها ومن ذكرها للجداول
-  const dump = fs.readFileSync(file, 'utf8');
-  ok(/PostgreSQL database dump complete/i.test(dump), 'النسخة مختومة — لم تُبتر');
-  ok(dump.includes('stores'), 'المحتوى يذكر جدول المتاجر');
+    const file = path.join(config.paths.backups, info.file);
+    ok(fs.existsSync(file), 'الملف موجود على القرص');
+
+    // التحقق يفتح النسخة فعلاً — نسخة لا تُفتح ليست نسخة
+    // نسخة pg_dump نصّية: نتحقّق من ختمها ومن ذكرها للجداول
+    const dump = fs.readFileSync(file, 'utf8');
+    ok(/PostgreSQL database dump complete/i.test(dump), 'النسخة مختومة — لم تُبتر');
+    ok(dump.includes('stores'), 'المحتوى يذكر جدول المتاجر');
+  }
 }
 {
   // نسخة مبتورة يجب أن تُرفض لا أن تُحفظ.

@@ -21,6 +21,7 @@ import { renderStore, renderSitemap, renderRobots } from './render.js';
 import { providerStatus } from './notify.js';
 import { runSubscriptionSweep, runReminderSweep } from './billing.js';
 import { startBackups, backupNow } from './backup.js';
+import { get as storageGet, verifyStorage } from './storage.js';
 
 /**
  * الإعداد يُتحقَّق منه قبل أي شيء آخر.
@@ -51,6 +52,13 @@ const PUBLIC_DIR = config.paths.public;
 //  قبل إنشاء الجداول.
 await migrate();
 await verifyIsolation();
+
+// التخزين يُفحص هنا لا عند أول رفع: تاجر يكتشف أن مفاتيح
+// السلة خاطئة بعد أن يملأ متجره صوراً تجربة سيئة جداً.
+{
+  const s = await verifyStorage();
+  log.info(`✓ التخزين: ${s.driver} — ${s.where}`);
+}
 
 const router = createRouter();
 registerAuth(router);
@@ -192,7 +200,7 @@ const server = http.createServer(async (req, res) => {
   try {
     // ٠. فحص الحياة — يسبق كل شيء ليبقى رخيصاً وسريعاً
     if (pathname === '/health' || pathname === '/healthz') {
-      return health(res);
+      return await health(res);
     }
 
     // ١. الـ API
@@ -219,6 +227,19 @@ const server = http.createServer(async (req, res) => {
     if (pathname.startsWith('/uploads/')) {
       const file = safeJoin(config.paths.data, pathname);
       if (file && serveFile(req, res, file, { immutable: true })) return;
+
+      // سلة R2 خاصة (بلا نطاق عام): نمرّ بالصورة بأنفسنا.
+      // مع R2_PUBLIC_URL لا يصل الطلب إلى هنا أصلاً — العنوان
+      // المخزَّن يشير إلى Cloudflare مباشرة.
+      if (config.storage.driver === 'r2') {
+        const object = await storageGet(pathname.slice('/uploads/'.length));
+        if (object) {
+          sendBody(req, res, object.buf, object.type, {
+            'cache-control': 'public, max-age=31536000, immutable',
+          });
+          return;
+        }
+      }
       throw new HttpError(404, 'الصورة غير موجودة');
     }
 
@@ -302,7 +323,7 @@ const server = http.createServer(async (req, res) => {
       if (store && store.status === 'active') {
         // HTML مولّد من الخادم: واتساب ومحركات البحث لا تنفّذ JS
         const shell = fs.readFileSync(path.join(PUBLIC_DIR, 'store.html'), 'utf8');
-        sendBody(req, res, renderStore(shell, store, originOf(req)), 'text/html; charset=utf-8',
+        sendBody(req, res, await renderStore(shell, store, originOf(req)), 'text/html; charset=utf-8',
           { 'cache-control': 'no-cache', ...SECURITY_HEADERS });
         return;
       }
@@ -370,7 +391,7 @@ async function health(res) {
     return json(res, { ok: false, status: 'shutting_down' }, 503);
   }
   try {
-    const stores = await db.prepare('SELECT COUNT(*) n FROM stores').get().n;
+    const stores = (await db.prepare('SELECT COUNT(*) n FROM stores').get()).n;
     json(res, {
       ok: true,
       uptime: Math.round((Date.now() - startedAt) / 1000),
@@ -392,12 +413,12 @@ const VERSION = (() => {
 // تنظيف دوري للجلسات والرموز المنتهية
 const timers = [];
 timers.push(setInterval(cleanupExpired, 60 * 60 * 1000));
-cleanupExpired();
+await cleanupExpired();
 
 // §٥.٥ — تدرّج انتهاء الاشتراك: نشط ← مهلة ← منتهٍ (بلا حذف)
 async function sweep() {
   try {
-    const changed = runSubscriptionSweep();
+    const changed = await runSubscriptionSweep();
     if (changed.toGrace || changed.toExpired) {
       log.info({ ...changed }, `اشتراكات: ${changed.toGrace} إلى المهلة · ${changed.toExpired} انتهت`);
     }
@@ -417,7 +438,7 @@ async function sweep() {
   }
 }
 timers.push(setInterval(sweep, 6 * 60 * 60 * 1000));
-sweep();
+await sweep();
 
 timers.push(startBackups());
 for (const t of timers) t?.unref?.();
@@ -433,10 +454,10 @@ function shutdown(signal) {
   log.info({ signal }, 'إيقاف رشيد — لا طلبات جديدة، ننتظر الجارية');
 
   // نتوقّف عن القبول، ثم ننتظر انتهاء ما هو قيد التنفيذ
-  server.close(() => {
+  server.close(async () => {
     for (const t of timers) clearInterval(t);
-    try { backupNow('shutdown'); } catch { /* لا نمنع الإيقاف */ }
-    try { db.close(); } catch { /* ربما أُغلقت */ }
+    try { await backupNow('shutdown'); } catch { /* لا نمنع الإيقاف */ }
+    try { await db.close(); } catch { /* ربما أُغلقت */ }
     log.info('انتهى الإيقاف بسلام');
     process.exit(0);
   });

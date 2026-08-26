@@ -3,18 +3,17 @@
 //
 //  «الصور هي أكبر بند تكلفة تشغيلية» — لذلك لا تُخزَّن داخل
 //  قاعدة البيانات كـ data URI، بل كملفات بمسارات منظّمة:
-//      uploads/stores/{store_id}/{kind}/{hash}.jpg
-//  وهو نفس التنظيم الذي ستأخذه لاحقاً على Object storage
-//  متوافق مع S3، فيصبح الانتقال تغيير دالة واحدة هنا.
+//      stores/{store_id}/{kind}/{hash}.jpg
+//  والوعد الذي قطعه هذا الملف — «الانتقال تغيير دالة
+//  واحدة» — استُوفي: كل الكتابة تمرّ الآن عبر storage.js،
+//  فيختار القرصَ أو Cloudflare R2 دون أن يعرف هذا الملف.
 //
 //  الضغط وإعادة التحجيم يحدثان في المتصفح قبل الرفع، ثم
 //  يُتحقق من الحجم هنا — لا يُترك للتاجر (§٥.٣).
 // ═══════════════════════════════════════════════════════════
-import fs from 'node:fs';
-import path from 'node:path';
 import crypto from 'node:crypto';
-import { UPLOAD_DIR } from './db.js';
 import { HttpError } from './http.js';
+import { put, dropPrefix } from './storage.js';
 
 const MAX_BYTES = 2 * 1024 * 1024;               // ٢ ميجابايت لكل صورة بعد الضغط
 const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
@@ -24,14 +23,15 @@ const DATA_URL = /^data:(image\/[a-z+]+);base64,([A-Za-z0-9+/=]+)$/;
 /**
  * يقبل إما data URI (فيحفظه كملف ويعيد مساره)
  * أو مساراً محفوظاً سابقاً (فيعيده كما هو).
- * @returns {string} مسار عام مثل /uploads/stores/3/logo/ab12cd.jpg
+ * @returns {Promise<string>} مسار عام أو عنوان مطلق على R2
  */
-export function saveImage(storeId, kind, value) {
+export async function saveImage(storeId, kind, value) {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
 
-  // مسار محفوظ سابقاً — أعده دون لمس القرص
-  if (raw.startsWith('/uploads/') || raw.startsWith('/assets/')) {
+  // قيمة محفوظة سابقاً — أعدها دون لمس التخزين.
+  // العناوين المطلقة تأتي من سلة R2 ذات النطاق العام.
+  if (raw.startsWith('/uploads/') || raw.startsWith('/assets/') || raw.startsWith('https://')) {
     return raw.slice(0, 300);
   }
 
@@ -45,22 +45,16 @@ export function saveImage(storeId, kind, value) {
   if (buf.length > MAX_BYTES) throw new HttpError(413, 'الصورة أكبر من ٢ ميجابايت');
   if (buf.length < 64)        throw new HttpError(400, 'ملف الصورة تالف');
 
-  const dir = path.join(UPLOAD_DIR, 'stores', String(storeId), kind);
-  fs.mkdirSync(dir, { recursive: true });
-
   // اسم من محتوى الصورة: الرفع نفسه مرتين لا ينتج ملفين
   const hash = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16);
-  const file = `${hash}.${ext}`;
-  const full = path.join(dir, file);
-  if (!fs.existsSync(full)) fs.writeFileSync(full, buf);
+  const key = `stores/${storeId}/${kind}/${hash}.${ext}`;
 
-  return `/uploads/stores/${storeId}/${kind}/${file}`;
+  return await put(key, buf, m[1]);
 }
 
 /** يحذف صور متجر كاملة (عند حذف المتجر من الإدارة) */
-export function dropStoreImages(storeId) {
-  const dir = path.join(UPLOAD_DIR, 'stores', String(storeId));
-  fs.rmSync(dir, { recursive: true, force: true });
+export async function dropStoreImages(storeId) {
+  await dropPrefix(`stores/${storeId}`);
 }
 
 /**
@@ -74,11 +68,12 @@ export function dropStoreImages(storeId) {
  * @returns {string} مسار صورة الغلاف
  */
 export async function syncGallery(s, productId, incoming, max) {
-  const urls = (Array.isArray(incoming) ? incoming : [])
-    .filter(Boolean)
-    .slice(0, Math.max(1, max))
-    .map((v) => saveImage(s.storeId, 'products', v))
-    .filter(Boolean);
+  const urls = (await Promise.all(
+    (Array.isArray(incoming) ? incoming : [])
+      .filter(Boolean)
+      .slice(0, Math.max(1, max))
+      .map((v) => saveImage(s.storeId, 'products', v)),
+  )).filter(Boolean);
 
   // نستبدل المعرض بالكامل: الترتيب القادم من الواجهة هو المرجع
   for (const row of await s.all('product_images', { product_id: productId })) {

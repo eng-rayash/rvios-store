@@ -142,7 +142,7 @@ async function viaWhatsApp(phone, code) {
   });
 
   const wamid = out?.messages?.[0]?.id ?? null;
-  trackOutbound(wamid, phone, 'otp');
+  await trackOutbound(wamid, phone, 'otp');
   return { ok: true, provider: 'whatsapp', id: wamid };
 }
 
@@ -243,7 +243,7 @@ export async function notifyMerchant(store, text) {
           type: 'text',
           text: { body: text },
         });
-        trackOutbound(out?.messages?.[0]?.id, store.whatsapp, 'notice');
+        await trackOutbound(out?.messages?.[0]?.id, store.whatsapp, 'notice');
         return { ok: true, provider: 'whatsapp' };
       } catch (err) { failures.push(`whatsapp: ${err.message}`); }
     }
@@ -289,7 +289,7 @@ export async function notifyNewOrder(store, order) {
         type: 'text',
         text: { body: text },
       });
-      trackOutbound(out?.messages?.[0]?.id, store.whatsapp, 'order');
+      await trackOutbound(out?.messages?.[0]?.id, store.whatsapp, 'order');
       return { ok: true, provider: 'whatsapp' };
     }
 

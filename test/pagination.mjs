@@ -18,11 +18,11 @@ const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.
 const { db: _db } = await import('../src/db.js');
 const { createSession, SESSION_COOKIE } = await import('../src/auth.js');
 
-const merchant = _db.prepare(
+const merchant = await _db.prepare(
   "SELECT m.* FROM merchants m JOIN stores s ON s.merchant_id = m.id WHERE s.slug = 'yazan'",
 ).get();
 
-const token = merchant ? createSession(merchant.id) : '';
+const token = merchant ? await createSession(merchant.id) : '';
 const cookie = token ? `${SESSION_COOKIE}=${encodeURIComponent(token)}` : '';
 
 const req = async (path, init = {}) => fetch(B + path, {
@@ -48,22 +48,22 @@ const db = _db;
 const { placeOrder } = await import('../src/orders.js');
 const { scope } = await import('../src/tenancy.js');
 
-const yazan = db.prepare("SELECT * FROM stores WHERE slug='yazan'").get();
-const nura  = db.prepare("SELECT * FROM stores WHERE slug='nura-boutique'").get();
+const yazan = await db.prepare("SELECT * FROM stores WHERE slug='yazan'").get();
+const nura  = await db.prepare("SELECT * FROM stores WHERE slug='nura-boutique'").get();
 ok(!!yazan, 'وُجد متجر ذي يزن');
 
-const pick = (storeId) => scope(storeId).all('products', { live: 1 }, { limit: 1 })[0];
-const prod = pick(yazan.id);
+const pick = async (storeId) => (await scope(storeId).all('products', { live: 1 }, { limit: 1 }))[0];
+const prod = await pick(yazan.id);
 ok(!!prod, 'وُجد منتج للطلب عليه');
 
 // مخزون وافر: نفاد المخزون سيوقف الإنشاء قبل بلوغ العدد
-db.prepare('UPDATE products SET qty = 9999 WHERE id = ?').run(prod.id);
+await db.prepare('UPDATE products SET qty = 9999 WHERE id = ?').run(prod.id);
 
 const NEED = 130;
 let made = 0;
 for (let i = 0; i < NEED; i++) {
   try {
-    placeOrder(yazan.id, yazan, {
+    await placeOrder(yazan.id, yazan, {
       lines: [{ id: prod.id, qty: 1 }],
       name: `عميل اختبار ${i}`,
       phone: '77' + String(7000000 + i).slice(-7),
@@ -79,14 +79,14 @@ ok(made > 100, `أُنشئ ${made} طلباً`);
 // طلب واحد في متجر نورا — علامة تسرّب نبحث عنها لاحقاً
 let nuraRef = null;
 if (nura) {
-  const np = pick(nura.id);
+  const np = await pick(nura.id);
   if (np) {
-    db.prepare('UPDATE products SET qty = 99 WHERE id = ?').run(np.id);
+    await db.prepare('UPDATE products SET qty = 99 WHERE id = ?').run(np.id);
     try {
-      nuraRef = placeOrder(nura.id, nura, {
+      nuraRef = (await placeOrder(nura.id, nura, {
         lines: [{ id: np.id, qty: 1 }],
         name: 'عميل نورا', phone: '733999888', address: 'تعز', note: '',
-      }).ref;
+      })).ref;
     } catch { /* لا يمنع بقية الاختبار */ }
   }
 }

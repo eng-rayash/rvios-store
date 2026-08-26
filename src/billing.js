@@ -19,8 +19,8 @@ export async function getSetting(key, fallback = null) {
   try { return JSON.parse(row.value); } catch { return row.value; }
 }
 
-export function setSetting(key, value) {
-  db.prepare(`INSERT INTO platform_settings (key, value, updated_at) VALUES (?,?,?)
+export async function setSetting(key, value) {
+  await db.prepare(`INSERT INTO platform_settings (key, value, updated_at) VALUES (?,?,?)
               ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
     .run(key, JSON.stringify(value), now());
 }
@@ -31,25 +31,25 @@ export function setSetting(key, value) {
  * يضبطها الفريق من لوحة الإدارة دون إعادة نشر.
  * null = لم تُحسم، وكل الواجهات تعرض «—».
  */
-export function planPrices() {
+export async function planPrices() {
   return {
     basic: 0,
-    plus: getSetting('price.plus', null),
-    pro:  getSetting('price.pro', null),
+    plus: await getSetting('price.plus', null),
+    pro:  await getSetting('price.pro', null),
   };
 }
 
 /** أسعار الخدمات لمرة واحدة */
-export function addonPrices() {
+export async function addonPrices() {
   return {
-    store_build: getSetting('price.store_build', null),
-    domain:      getSetting('price.domain', null),
-    extra_store: getSetting('price.extra_store', null),
+    store_build: await getSetting('price.store_build', null),
+    domain:      await getSetting('price.domain', null),
+    extra_store: await getSetting('price.extra_store', null),
   };
 }
 
 /** خصم الاشتراك السنوي — شهران مجاناً افتراضياً (§٥.٦) */
-export const YEARLY_MONTHS_FREE = () => getSetting('billing.yearlyMonthsFree', 2);
+export const YEARLY_MONTHS_FREE = async () => await getSetting('billing.yearlyMonthsFree', 2);
 
 // ── وسائل الدفع ──────────────────────────────────────────
 export const PAYMENT_METHODS = [
@@ -58,10 +58,11 @@ export const PAYMENT_METHODS = [
   { id: 'paypal',  name: 'PayPal',       scope: 'intl',  instructionsKey: 'pay.paypal' },
 ];
 
-export function paymentMethods() {
-  return PAYMENT_METHODS
-    .map((m) => ({ ...m, instructions: getSetting(m.instructionsKey, '') }))
-    .filter((m) => m.instructions);      // لا نعرض وسيلة بلا تعليمات تحويل
+export async function paymentMethods() {
+  // map غير متزامنة تعيد وعوداً — Promise.all تنتظرها معاً
+  const withText = await Promise.all(PAYMENT_METHODS
+    .map(async (m) => ({ ...m, instructions: await getSetting(m.instructionsKey, '') })));
+  return withText.filter((m) => m.instructions);   // لا نعرض وسيلة بلا تعليمات تحويل
 }
 
 // ── الاشتراك ─────────────────────────────────────────────
@@ -100,7 +101,7 @@ export async function subscriptionOf(store) {
     status: sub.status,
     currentPeriodEnd: sub.current_period_end,
     daysLeft,
-    effectivePlan: effectivePlan(store),
+    effectivePlan: await effectivePlan(store),
     graceDays: GRACE_DAYS,
   };
 }
@@ -131,11 +132,11 @@ export async function createInvoice(storeId, { kind, plan = null, months = 1 }) 
   let amount;
   if (kind === 'subscription') {
     if (!PLANS[plan] || plan === 'basic') throw new HttpError(400, 'باقة غير صالحة للفوترة');
-    const monthly = planPrices()[plan];
+    const monthly = (await planPrices())[plan];
     if (!monthly) {
       throw new HttpError(409, 'سعر هذه الباقة لم يُعلن بعد — تواصل معنا لإتمام الترقية', 'PRICE_UNSET');
     }
-    const billed = months >= 12 ? months - YEARLY_MONTHS_FREE() : months;
+    const billed = months >= 12 ? months - (await YEARLY_MONTHS_FREE()) : months;
     amount = monthly * billed;
   } else {
     // المتجر الإضافي حكر على برو — الباقة تفتح الإمكانية ولا تهدي متجراً
@@ -144,12 +145,12 @@ export async function createInvoice(storeId, { kind, plan = null, months = 1 }) 
       if (!PLANS[store?.plan]?.canBuyExtraStores) {
         throw new HttpError(409, 'المتاجر الإضافية متاحة في باقة برو — رقِّ باقتك أولاً', 'PRO_REQUIRED');
       }
-      const m = merchantOfStore(storeId);
+      const m = await merchantOfStore(storeId);
       if ((m?.store_slots ?? 1) >= MAX_STORE_SLOTS) {
         throw new HttpError(409, `الحد الأقصى ${MAX_STORE_SLOTS.toLocaleString('ar-EG')} متاجر لكل حساب`, 'SLOT_MAX');
       }
     }
-    amount = addonPrices()[kind];
+    amount = (await addonPrices())[kind];
     if (!amount) {
       throw new HttpError(409, 'سعر هذه الخدمة لم يُعلن بعد — تواصل معنا', 'PRICE_UNSET');
     }
@@ -165,9 +166,9 @@ export async function createInvoice(storeId, { kind, plan = null, months = 1 }) 
    * الحالة ٢ كانت تعيد الفاتورة القديمة بصمت: يطلب التاجر برو
    * فيرى فاتورة بلس بمبلغ آخر ورسالة «أُنشئت فاتورتك».
    */
-  const open = await s.raw(
+  const open = (await s.raw(
     `SELECT * FROM invoices WHERE store_id = ? AND kind = ? AND status IN ('unpaid','under_review')
-     ORDER BY created_at DESC LIMIT 1`, [storeId, kind])[0];
+     ORDER BY created_at DESC, id DESC LIMIT 1`, [storeId, kind]))[0];
 
   if (open) {
     const same = (open.plan ?? null) === (plan ?? null) && open.months === months;
@@ -183,7 +184,7 @@ export async function createInvoice(storeId, { kind, plan = null, months = 1 }) 
   }
 
   const id = await s.insert('invoices', {
-    ref: nextRef(),
+    ref: await nextRef(),
     kind, plan, months,
     amount,
     currency: 'YER',
@@ -212,8 +213,8 @@ export async function submitProof(storeId, invoiceId, { method, proofKey }) {
   await s.update('invoices', invoiceId, { status: 'under_review', method: method ?? '', proof_key: proofKey });
 
   // التفعيل فوري قبل المراجعة (§٥.٣) — للاشتراك وللخانة معاً
-  if (inv.kind === 'subscription') activatePlan(storeId, inv.plan, inv.months);
-  if (inv.kind === 'extra_store')  grantStoreSlot(storeId);
+  if (inv.kind === 'subscription') await activatePlan(storeId, inv.plan, inv.months);
+  if (inv.kind === 'extra_store')  await grantStoreSlot(storeId);
 
   return await s.get('invoices', { id: invoiceId });
 }
@@ -221,7 +222,7 @@ export async function submitProof(storeId, invoiceId, { method, proofKey }) {
 /** يفعّل الباقة ويمدّ الفترة */
 export async function activatePlan(storeId, plan, months = 1) {
   const s = scope(storeId);
-  ensureSubscription(storeId);
+  await ensureSubscription(storeId);
   const sub = await s.get('subscriptions', {});
 
   // التمديد من نهاية الفترة الحالية إن كانت سارية، وإلا من اليوم
@@ -241,15 +242,15 @@ export async function markPaid(invoiceId, actor) {
   const inv = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
   if (!inv) throw new HttpError(404, 'الفاتورة غير موجودة');
 
-  db.prepare('UPDATE invoices SET status = ?, paid_at = ?, reviewed_by = ? WHERE id = ?')
+  await db.prepare('UPDATE invoices SET status = ?, paid_at = ?, reviewed_by = ? WHERE id = ?')
     .run('paid', now(), actor, invoiceId);
 
   // التفعيل قد يكون تم عند رفع الإيصال؛ نضمنه هنا للفواتير المؤكدة يدوياً
   if (inv.status !== 'under_review') {
-    if (inv.kind === 'subscription') activatePlan(inv.store_id, inv.plan, inv.months);
-    if (inv.kind === 'extra_store')  grantStoreSlot(inv.store_id);
+    if (inv.kind === 'subscription') await activatePlan(inv.store_id, inv.plan, inv.months);
+    if (inv.kind === 'extra_store')  await grantStoreSlot(inv.store_id);
   }
-  audit(actor, 'invoice.paid', inv.ref, `${inv.amount} ${inv.currency}`);
+  await audit(actor, 'invoice.paid', inv.ref, `${inv.amount} ${inv.currency}`);
   return await db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
 }
 
@@ -258,7 +259,7 @@ export async function voidInvoice(invoiceId, actor, reason) {
   const inv = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
   if (!inv) throw new HttpError(404, 'الفاتورة غير موجودة');
 
-  db.prepare('UPDATE invoices SET status = ?, reviewed_by = ?, void_reason = ? WHERE id = ?')
+  await db.prepare('UPDATE invoices SET status = ?, reviewed_by = ?, void_reason = ? WHERE id = ?')
     .run('void', actor, reason ?? '', invoiceId);
 
   if (inv.status === 'under_review') {
@@ -270,9 +271,9 @@ export async function voidInvoice(invoiceId, actor, reason) {
         await db.prepare('UPDATE stores SET plan = ? WHERE id = ?').run('basic', inv.store_id);
       }
     }
-    if (inv.kind === 'extra_store') revokeStoreSlot(inv.store_id);
+    if (inv.kind === 'extra_store') await revokeStoreSlot(inv.store_id);
   }
-  audit(actor, 'invoice.void', inv.ref, reason ?? '');
+  await audit(actor, 'invoice.void', inv.ref, reason ?? '');
   return await db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
 }
 
@@ -327,9 +328,9 @@ async function sendReminder(sub, store, stage, daysLeft) {
   const text = reminderText(store, stage, daysLeft);
   try {
     await notifyMerchant(store, text);
-    db.prepare('UPDATE subscriptions SET notified_stage = ?, notified_at = ? WHERE id = ?')
+    await db.prepare('UPDATE subscriptions SET notified_stage = ?, notified_at = ? WHERE id = ?')
       .run(stage, now(), sub.id);
-    audit('system', 'subscription.reminder', store.slug, stage);
+    await audit('system', 'subscription.reminder', store.slug, stage);
     return true;
   } catch (err) {
     console.error(`✖ تعذّر تذكير ${store.slug} (${stage}):`, err.message);
@@ -343,7 +344,7 @@ export async function runReminderSweep() {
 
   for (const { key, days } of STAGES) {
     const until = new Date(Date.now() + days * 86400000).toISOString();
-    const rows = db.prepare(`
+    const rows = await db.prepare(`
       SELECT s.*, st.name, st.slug, st.whatsapp
       FROM subscriptions s JOIN stores st ON st.id = s.store_id
       WHERE s.plan != 'basic' AND s.status = 'active'
@@ -375,7 +376,7 @@ export async function runSubscriptionSweep() {
   for (const sub of due) {
     await db.prepare('UPDATE subscriptions SET status = ? WHERE id = ?').run('grace', sub.id);
     changed.toGrace++;
-    notifyStage(sub.store_id, 'grace', sub.id);
+    await notifyStage(sub.store_id, 'grace', sub.id);
   }
 
   const expired = await db.prepare(`
@@ -385,7 +386,7 @@ export async function runSubscriptionSweep() {
     await db.prepare('UPDATE subscriptions SET status = ? WHERE id = ?').run('expired', sub.id);
     await db.prepare('UPDATE stores SET plan = ? WHERE id = ?').run('basic', sub.store_id);
     changed.toExpired++;
-    notifyStage(sub.store_id, 'expired', sub.id);
+    await notifyStage(sub.store_id, 'expired', sub.id);
   }
 
   return changed;
@@ -400,11 +401,11 @@ async function notifyStage(storeId, stage, subId) {
   const store = await db.prepare('SELECT * FROM stores WHERE id = ?').get(storeId);
   if (!store) return;
 
-  notifyMerchant(store, reminderText(store, stage, 0))
-    .then(() => {
-      db.prepare('UPDATE subscriptions SET notified_stage = ?, notified_at = ? WHERE id = ?')
+  await notifyMerchant(store, reminderText(store, stage, 0))
+    .then(async () => {
+      await db.prepare('UPDATE subscriptions SET notified_stage = ?, notified_at = ? WHERE id = ?')
         .run(stage, now(), subId);
-      audit('system', 'subscription.reminder', store.slug, stage);
+      await audit('system', 'subscription.reminder', store.slug, stage);
     })
     .catch((err) => console.error(`✖ تعذّر إشعار ${store.slug} (${stage}):`, err.message));
 }
@@ -433,7 +434,7 @@ async function merchantOfStore(storeId) {
  * الخانة مملوكة للحساب لا للمتجر الذي صدرت منه الفاتورة.
  */
 export async function grantStoreSlot(storeId) {
-  const m = merchantOfStore(storeId);
+  const m = await merchantOfStore(storeId);
   if (!m) return null;
   const next = Math.min(MAX_STORE_SLOTS, (m.store_slots ?? 1) + 1);
   await db.prepare('UPDATE merchants SET store_slots = ? WHERE id = ?').run(next, m.id);
@@ -446,9 +447,9 @@ export async function grantStoreSlot(storeId) {
  * ولا يحذف قائماً — بيانات التاجر لا تُمس بقرار فوترة.
  */
 export async function revokeStoreSlot(storeId) {
-  const m = merchantOfStore(storeId);
+  const m = await merchantOfStore(storeId);
   if (!m) return null;
-  const owned = await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(m.id).n;
+  const owned = (await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(m.id)).n;
   const next = Math.max(1, owned, (m.store_slots ?? 1) - 1);
   await db.prepare('UPDATE merchants SET store_slots = ? WHERE id = ?').run(next, m.id);
   return next;
@@ -456,13 +457,13 @@ export async function revokeStoreSlot(storeId) {
 
 /** حالة الخانات لعرضها للتاجر */
 export async function slotsOf(merchant) {
-  const owned = await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id).n;
+  const owned = (await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id)).n;
   const slots = merchant.store_slots ?? 1;
   return { owned, slots, free: Math.max(0, slots - owned), max: MAX_STORE_SLOTS };
 }
 
 // ── سجل التدقيق ──────────────────────────────────────────
-export function audit(actor, action, target = '', detail = '') {
-  db.prepare('INSERT INTO audit_log (actor, action, target, detail, created_at) VALUES (?,?,?,?,?)')
+export async function audit(actor, action, target = '', detail = '') {
+  await db.prepare('INSERT INTO audit_log (actor, action, target, detail, created_at) VALUES (?,?,?,?,?)')
     .run(actor, action, String(target ?? ''), String(detail ?? ''), now());
 }

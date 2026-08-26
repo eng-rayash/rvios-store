@@ -183,7 +183,7 @@ export function listBackups() {
   if (!fs.existsSync(dir)) return [];
 
   return fs.readdirSync(dir)
-    .filter((f) => f.startsWith('rvios-') && f.endsWith('.db'))
+    .filter((f) => f.startsWith('rvios-') && f.endsWith('.sql'))
     .sort().reverse()
     .map((f) => {
       const s = fs.statSync(path.join(dir, f));

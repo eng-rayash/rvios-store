@@ -32,11 +32,11 @@ export default async function register(r) {
 
     // §٢.٢ — حد على الرقم وعلى الـIP معاً (§٧ خطر ٢: استنزاف رصيد الرسائل)
     const windowMs = config.otp.windowMinutes * 60_000;
-    rateLimit(`otp:${phone}`,            { max: config.otp.perPhone, windowMs });
-    rateLimit(`otp-ip:${clientIp(req)}`, { max: config.otp.perIp,    windowMs });
-    assertResendAllowed(phone);
+    await rateLimit(`otp:${phone}`,            { max: config.otp.perPhone, windowMs });
+    await rateLimit(`otp-ip:${clientIp(req)}`, { max: config.otp.perIp,    windowMs });
+    await assertResendAllowed(phone);
 
-    const code = issueOtp(phone);
+    const code = await issueOtp(phone);
 
     // فشل الإرسال يجب أن يظهر للمستخدم، لا أن يُبتلع صامتاً
     try {
@@ -63,11 +63,11 @@ export default async function register(r) {
     const phone = normalizePhone(body.phone);
     if (!validPhone(phone)) bad('رقم الجوال غير صحيح');
 
-    verifyOtp(phone, body.code);
+    await verifyOtp(phone, body.code);
 
-    const merchant = findOrCreateMerchant(phone);
-    const token = createSession(merchant.id);
-    const stores = storeSummary(merchant.id);
+    const merchant = await findOrCreateMerchant(phone);
+    const token = await createSession(merchant.id);
+    const stores = await storeSummary(merchant.id);
 
     json(res, {
       ok: true,
@@ -80,10 +80,10 @@ export default async function register(r) {
 
   // ── ٣. من أنا ─────────────────────────────────────────
   r.get('/api/auth/me', async (req, res) => {
-    const m = currentMerchant(req);
+    const m = await currentMerchant(req);
     if (!m) return json(res, { authenticated: false });
 
-    const stores = storeSummary(m.id);
+    const stores = await storeSummary(m.id);
     const owned = stores.length;
     const slots = m.store_slots ?? 1;
 
@@ -100,7 +100,7 @@ export default async function register(r) {
 
   // ── ٤. خروج ───────────────────────────────────────────
   r.post('/api/auth/logout', async (req, res) => {
-    destroySession(parseCookies(req)[SESSION_COOKIE]);
+    await destroySession(parseCookies(req)[SESSION_COOKIE]);
     json(res, { ok: true }, 200, { 'set-cookie': cookieHeader(SESSION_COOKIE, '', { clear: true }) });
   });
 
@@ -108,17 +108,17 @@ export default async function register(r) {
   r.get('/api/slug/check', async (req, res) => {
     const raw = req.query.get('q') ?? '';
     if (!raw.trim()) return json(res, { slug: '', ok: false, reason: 'اكتب اسم متجرك' });
-    const result = checkSlug(raw);
-    json(res, { ...result, suggestion: result.ok ? null : suggestSlug(raw) });
+    const result = await checkSlug(raw);
+    json(res, { ...result, suggestion: result.ok ? null : await suggestSlug(raw) });
   });
 
   // ── ٦. إنشاء المتجر — نهاية تدفق الإعداد (§٣.٢) ────────
   r.post('/api/stores', async (req, res) => {
-    const merchant = requireMerchant(req);
+    const merchant = await requireMerchant(req);
     const body = await readBody(req);
 
     // خانات المتاجر: التاجر يبدأ بواحدة، والإضافية تُشترى (برو)
-    const owned = await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id).n;
+    const owned = (await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id)).n;
     if (owned >= (merchant.store_slots ?? 1)) {
       bad('بلغتَ عدد المتاجر المتاح في حسابك. اشترِ خانة متجر إضافي من قسم الاشتراك.', 'NO_STORE_SLOT');
     }
@@ -126,7 +126,7 @@ export default async function register(r) {
     const name = clean(body.name, 60);
     if (name.length < 2) bad('اسم المتجر مطلوب');
 
-    const check = checkSlug(body.slug || name);
+    const check = await checkSlug(body.slug || name);
     if (!check.ok) bad(check.reason);
 
     const whatsapp = normalizePhone(body.whatsapp || merchant.phone);
@@ -138,11 +138,11 @@ export default async function register(r) {
      * بلا قيمة. الأول يبدأ بالمجانية كالمعتاد.
      */
     const inherited = owned === 0 ? 'basic'
-      : await db.prepare(`SELECT plan FROM stores WHERE merchant_id = ?
+      : (await db.prepare(`SELECT plan FROM stores WHERE merchant_id = ?
                     ORDER BY CASE plan WHEN 'pro' THEN 3 WHEN 'plus' THEN 2 ELSE 1 END DESC
-                    LIMIT 1`).get(merchant.id)?.plan ?? 'basic';
+                    LIMIT 1`).get(merchant.id))?.plan ?? 'basic';
 
-    const storeId = Number(db.prepare(`
+    const storeId = Number((await db.prepare(`
       INSERT INTO stores (merchant_id, slug, name, sector, tagline, city, whatsapp, color, color_deep, plan, created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
       .run(
@@ -155,14 +155,14 @@ export default async function register(r) {
         /^#[0-9A-Fa-f]{6}$/.test(body.colorDeep ?? '') ? body.colorDeep : '#6E1519',
         inherited,
         now(),
-      ).lastInsertRowid);
+      )).lastInsertRowid);
 
     // كل متجر يحتاج صف اشتراك — لم تكن تُستدعى عند الإنشاء إطلاقاً
-    ensureSubscription(storeId, inherited);
+    await ensureSubscription(storeId, inherited);
 
     // الصور تُحفظ كملفات بعد توفّر store_id (§٥.٣)
-    const logo   = saveImage(storeId, 'logo', body.logo);
-    const banner = saveImage(storeId, 'banner', body.banner);
+    const logo   = await saveImage(storeId, 'logo', body.logo);
+    const banner = await saveImage(storeId, 'banner', body.banner);
     if (logo || banner) {
       await db.prepare('UPDATE stores SET logo = ?, banner = ? WHERE id = ?').run(logo, banner, storeId);
     }
@@ -180,7 +180,7 @@ export default async function register(r) {
         name: clean(body.product.name, 100),
         price: Math.max(0, Number(body.product.price) || 0),
         qty: Math.max(0, Number(body.product.qty) || 1),
-        image: saveImage(storeId, 'products', body.product.image),
+        image: await saveImage(storeId, 'products', body.product.image),
         live: 1,
         created_at: now(),
       });
@@ -190,8 +190,8 @@ export default async function register(r) {
   });
 
   // ── ٧. الباقات (عامة — لصفحة الأسعار) ─────────────────
-  r.get('/api/plans', (_req, res) => {
-    const prices = planPrices();
+  r.get('/api/plans', async (_req, res) => {
+    const prices = await planPrices();
     json(res, Object.values(PLANS).map((p) => ({
       ...p,
       products: p.products === Infinity ? null : p.products,
@@ -202,15 +202,15 @@ export default async function register(r) {
 
   // ── ٨. دخول الإدارة ───────────────────────────────────
   r.post('/api/admin/login', async (req, res) => {
-    rateLimit(`admin:${clientIp(req)}`, { max: 6, windowMs: 10 * 60_000 });
+    await rateLimit(`admin:${clientIp(req)}`, { max: 6, windowMs: 10 * 60_000 });
     const body = await readBody(req);
     if (String(body.pass ?? '') !== ADMIN_PASS) throw new HttpError(401, 'كلمة المرور غير صحيحة');
-    const token = createAdminSession();
+    const token = await createAdminSession();
     json(res, { ok: true }, 200, { 'set-cookie': cookieHeader(ADMIN_COOKIE, token, { maxAge: 60 * 60 * 12 }) });
   });
 
   r.post('/api/admin/logout', async (req, res) => {
-    destroySession(parseCookies(req)[ADMIN_COOKIE]);
+    await destroySession(parseCookies(req)[ADMIN_COOKIE]);
     json(res, { ok: true }, 200, { 'set-cookie': cookieHeader(ADMIN_COOKIE, '', { clear: true }) });
   });
 }

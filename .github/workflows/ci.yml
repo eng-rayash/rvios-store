@@ -65,6 +65,9 @@ jobs:
       - name: تدقيق الجاهزية
         run: npm run readiness
 
+      - name: فحص التخزين
+        run: npm run check:storage
+
       - name: تجهيز قاعدة بيانات نظيفة
         run: npm run reset
 
@@ -87,6 +90,8 @@ jobs:
           node --no-warnings test/pages.mjs
           node --no-warnings test/webhook.mjs
           node --no-warnings test/infra.mjs
+          node --no-warnings test/reminders.mjs
+          node --no-warnings test/pwa.mjs
           node --no-warnings test/pagination.mjs
 
       - name: الإيقاف الرشيد يعمل

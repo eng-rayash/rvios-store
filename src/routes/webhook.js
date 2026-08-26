@@ -83,7 +83,7 @@ export default function register(r) {
       const body = JSON.parse(raw);
       for (const entry of body?.entry ?? []) {
         for (const change of entry?.changes ?? []) {
-          handleStatuses(change?.value?.statuses ?? []);
+          await handleStatuses(change?.value?.statuses ?? []);
           handleIncoming(change?.value?.messages ?? []);
         }
       }
@@ -94,13 +94,13 @@ export default function register(r) {
 }
 
 /** تحديث حالة رسالة صادرة: sent → delivered → read، أو failed */
-function handleStatuses(statuses) {
+async function handleStatuses(statuses) {
   const upd = db.prepare(`UPDATE wa_messages
                           SET status = ?, error_code = ?, error_text = ?, updated_at = ?
                           WHERE wamid = ?`);
   for (const s of statuses) {
     const err = s.errors?.[0];
-    upd.run(
+    await upd.run(
       s.status ?? 'sent',
       err?.code != null ? String(err.code) : null,
       err?.title ?? err?.message ?? null,

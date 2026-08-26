@@ -3,7 +3,7 @@
 //  الجمهور: فريق RVIOS داخلياً.
 //
 //  الإدارة هي الطرف الوحيد المسموح له بالعمل عبر المتاجر،
-//  ولذلك لا تمر عبر scope() — بل عبر requireAdmin() صراحةً.
+//  ولذلك لا تمر عبر scope() — بل عبر await requireAdmin() صراحةً.
 // ═══════════════════════════════════════════════════════════
 import { db, now } from '../db.js';
 import { json, readBody, bad, notFound, clean, toInt } from '../http.js';
@@ -19,13 +19,13 @@ export default async function register(r) {
 
   // ── الحالة ────────────────────────────────────────────
   r.get('/api/admin/session', async (req, res) => {
-    try { requireAdmin(req); json(res, { admin: true }); }
+    try { await requireAdmin(req); json(res, { admin: true }); }
     catch { json(res, { admin: false }); }
   });
 
   // ── إحصائيات عامة (§٣.٥) ──────────────────────────────
   r.get('/api/admin/stats', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     // عدّاد مختصر — async لأن كل استعلام صار غير متزامن
     const one = async (sql, ...p) => (await db.prepare(sql).get(...p));
 
@@ -62,38 +62,38 @@ export default async function register(r) {
       paidMerchants,
       multiStore,
       upgradeRate: merchants ? Math.round((paidMerchants / merchants) * 100) : 0,
-      verified:  await one('SELECT COUNT(*) n FROM stores WHERE verified = 1').n,
-      orders:    await one('SELECT COUNT(*) n FROM orders').n,
-      confirmed: await one(`SELECT COUNT(*) n FROM orders WHERE status IN ('ok','done')`).n,
-      products:  await one('SELECT COUNT(*) n FROM products').n,
-      pendingInvoices: await one(`SELECT COUNT(*) n FROM invoices WHERE status='under_review'`).n,
-      unpaidInvoices:  await one(`SELECT COUNT(*) n FROM invoices WHERE status='unpaid'`).n,
-      revenue: await one(`SELECT COALESCE(SUM(amount),0) n FROM invoices WHERE status='paid'`).n,
-      openReports:  await one(`SELECT COUNT(*) n FROM reports WHERE status='open'`).n,
-      openRequests: await one(`SELECT COUNT(*) n FROM service_requests WHERE status='open'`).n,
+      verified:  (await one('SELECT COUNT(*) n FROM stores WHERE verified = 1')).n,
+      orders:    (await one('SELECT COUNT(*) n FROM orders')).n,
+      confirmed: (await one(`SELECT COUNT(*) n FROM orders WHERE status IN ('ok','done')`)).n,
+      products:  (await one('SELECT COUNT(*) n FROM products')).n,
+      pendingInvoices: (await one(`SELECT COUNT(*) n FROM invoices WHERE status='under_review'`)).n,
+      unpaidInvoices:  (await one(`SELECT COUNT(*) n FROM invoices WHERE status='unpaid'`)).n,
+      revenue: (await one(`SELECT COALESCE(SUM(amount),0) n FROM invoices WHERE status='paid'`)).n,
+      openReports:  (await one(`SELECT COUNT(*) n FROM reports WHERE status='open'`)).n,
+      openRequests: (await one(`SELECT COUNT(*) n FROM service_requests WHERE status='open'`)).n,
     });
   });
 
   // ── إدارة التجار والمتاجر ─────────────────────────────
   r.get('/api/admin/stores', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const q = (req.query.get('q') ?? '').trim();
     const like = `%${q}%`;
-    const rows = db.prepare(`
+    const rows = await db.prepare(`
       SELECT s.*, m.phone owner_phone, m.name owner_name, m.store_slots owner_slots,
              (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id) products,
              (SELECT COUNT(*) FROM orders o WHERE o.store_id = s.id) orders,
              (SELECT COUNT(*) FROM reports r WHERE r.store_id = s.id AND r.status='open') reports,
              (SELECT COUNT(*) FROM stores x WHERE x.merchant_id = s.merchant_id) owner_stores
       FROM stores s JOIN merchants m ON m.id = s.merchant_id
-      ${q ? 'WHERE s.name LIKE ? OR s.slug LIKE ? OR m.phone LIKE ?' : ''}
+      ${q ? 'WHERE s.name ILIKE ? OR s.slug ILIKE ? OR m.phone ILIKE ?' : ''}
       ORDER BY s.id DESC LIMIT 200`)
       .all(...(q ? [like, like, like] : []));
     json(res, rows.map((s) => ({ ...s, verified: !!s.verified })));
   });
 
   r.patch('/api/admin/stores/:id', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const id = toInt(req.params.id);
     const store = await db.prepare('SELECT * FROM stores WHERE id = ?').get(id);
     if (!store) notFound('المتجر غير موجود');
@@ -111,23 +111,23 @@ export default async function register(r) {
     }
     if (!Object.keys(patch).length) bad('لا يوجد تغيير');
 
-    db.prepare(`UPDATE stores SET ${Object.keys(patch).map((k) => `${k}=?`).join(',')} WHERE id = ?`)
+    await db.prepare(`UPDATE stores SET ${Object.keys(patch).map((k) => `${k}=?`).join(',')} WHERE id = ?`)
       .run(...Object.values(patch), id);
     json(res, { ok: true, store: await db.prepare('SELECT * FROM stores WHERE id = ?').get(id) });
   });
 
   r.delete('/api/admin/stores/:id', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const id = toInt(req.params.id);
-    const n = await db.prepare('DELETE FROM stores WHERE id = ?').run(id).changes;
+    const n = (await db.prepare('DELETE FROM stores WHERE id = ?').run(id)).changes;
     if (!n) notFound('المتجر غير موجود');
-    dropStoreImages(id);   // لا نترك صوراً يتيمة على القرص
+    await dropStoreImages(id);   // لا نترك صوراً يتيمة على القرص
     json(res, { ok: true });
   });
 
   // ── البلاغات (§٦.٢) ───────────────────────────────────
   r.get('/api/admin/reports', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const status = req.query.get('status') ?? 'open';
     json(res, await db.prepare(`
       SELECT r.*, s.name store_name, s.slug store_slug
@@ -136,17 +136,17 @@ export default async function register(r) {
   });
 
   r.patch('/api/admin/reports/:id', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const { status } = await readBody(req);
     if (!['open', 'closed'].includes(status)) bad('حالة غير معروفة');
-    const n = await db.prepare('UPDATE reports SET status = ? WHERE id = ?').run(status, toInt(req.params.id)).changes;
+    const n = (await db.prepare('UPDATE reports SET status = ? WHERE id = ?').run(status, toInt(req.params.id))).changes;
     if (!n) notFound('البلاغ غير موجود');
     json(res, { ok: true });
   });
 
   // ── طلبات الخدمات والتوثيق (§٣.٥) ─────────────────────
   r.get('/api/admin/requests', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const status = req.query.get('status') ?? 'open';
     json(res, await db.prepare(`
       SELECT sr.*, s.name store_name, s.slug store_slug
@@ -155,7 +155,7 @@ export default async function register(r) {
   });
 
   r.patch('/api/admin/requests/:id', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const body = await readBody(req);
     const id = toInt(req.params.id);
     const reqRow = await db.prepare('SELECT * FROM service_requests WHERE id = ?').get(id);
@@ -174,7 +174,7 @@ export default async function register(r) {
   // ═══ مراجعة المدفوعات (§٥.٦) ══════════════════════════
   //  «ستكون أكثر أقسام لوحة الإدارة استخداماً»
   r.get('/api/admin/invoices', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const status = req.query.get('status') ?? 'under_review';
     const rows = await db.prepare(`
       SELECT i.*, s.name store_name, s.slug store_slug, m.phone owner_phone
@@ -186,33 +186,35 @@ export default async function register(r) {
   });
 
   r.patch('/api/admin/invoices/:id', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const body = await readBody(req);
     const id = toInt(req.params.id);
     const actor = 'admin';
 
     if (body.action === 'paid') {
-      return json(res, { ok: true, invoice: markPaid(id, actor) });
+      return json(res, { ok: true, invoice: await markPaid(id, actor) });
     }
     if (body.action === 'void') {
-      return json(res, { ok: true, invoice: voidInvoice(id, actor, clean(body.reason, 200)) });
+      return json(res, { ok: true, invoice: await voidInvoice(id, actor, clean(body.reason, 200)) });
     }
     bad('إجراء غير معروف');
   });
 
   // ── إعدادات المنصة: الأسعار وتعليمات التحويل (§١١) ─────
   r.get('/api/admin/settings', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     json(res, {
-      prices: planPrices(),
-      addons: addonPrices(),
-      yearlyMonthsFree: YEARLY_MONTHS_FREE(),
-      methods: PAYMENT_METHODS.map((m) => ({ ...m, instructions: getSetting(m.instructionsKey, '') })),
+      prices: await planPrices(),
+      addons: await addonPrices(),
+      yearlyMonthsFree: await YEARLY_MONTHS_FREE(),
+      methods: await Promise.all(
+        PAYMENT_METHODS.map(async (m) => ({ ...m, instructions: await getSetting(m.instructionsKey, '') })),
+      ),
     });
   });
 
   r.patch('/api/admin/settings', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const body = await readBody(req);
     const allowed = new Set([
       'price.plus', 'price.pro', 'price.store_build', 'price.domain', 'price.extra_store',
@@ -223,26 +225,26 @@ export default async function register(r) {
       if (!allowed.has(key)) continue;
       const v = key.startsWith('pay.') ? clean(value, 600)
               : (value === null || value === '' ? null : Math.max(0, toInt(value)));
-      setSetting(key, v);
+      await setSetting(key, v);
       applied.push(key);
     }
     if (!applied.length) bad('لا يوجد إعداد صالح للتحديث');
-    audit('admin', 'settings.update', applied.join(','), '');
-    json(res, { ok: true, applied, prices: planPrices(), addons: addonPrices() });
+    await audit('admin', 'settings.update', applied.join(','), '');
+    json(res, { ok: true, applied, prices: await planPrices(), addons: await addonPrices() });
   });
 
   // ── سجل التدقيق ───────────────────────────────────────
   r.get('/api/admin/audit', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     json(res, await db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 200').all());
   });
 
   // ── الباقات (§٣.٥ إدارة الباقات والأسعار) ─────────────
   r.get('/api/admin/plans', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const usage = await db.prepare('SELECT plan, COUNT(*) n FROM stores GROUP BY plan').all();
     const byPlan = Object.fromEntries(usage.map((u) => [u.plan, u.n]));
-    const prices = planPrices();
+    const prices = await planPrices();
     json(res, Object.values(PLANS).map((p) => ({
       ...p,
       products: p.products === Infinity ? null : p.products,

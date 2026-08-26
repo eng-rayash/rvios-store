@@ -105,7 +105,7 @@ export async function placeOrder(storeId, store, { lines, name, phone, note, add
     const subtotal = priced.reduce((a, l) => a + l.price * l.qty, 0);
     const delivery = deliveryFor(store, subtotal);
     const total = subtotal + delivery;
-    const ref = uniqueRef();
+    const ref = await uniqueRef();
 
     const orderId = await s.insert('orders', {
       ref,

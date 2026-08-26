@@ -64,14 +64,14 @@ try {
 }
 
 // ── نسبة الوصول الفعلية من سجل الـWebhook ────────────────
-const rows = db.prepare(`SELECT status, COUNT(*) n FROM wa_messages GROUP BY status`).all();
+const rows = await db.prepare(`SELECT status, COUNT(*) n FROM wa_messages GROUP BY status`).all();
 if (rows.length) {
   const total = rows.reduce((a, r) => a + r.n, 0);
   console.log('\n  ── تسليم الرسائل ──');
   for (const r of rows) {
     line(r.status, `${r.n} (${Math.round((r.n / total) * 100)}٪)`);
   }
-  const fails = db.prepare(`SELECT phone, error_text FROM wa_messages
+  const fails = await db.prepare(`SELECT phone, error_text FROM wa_messages
                             WHERE status='failed' ORDER BY sent_at DESC LIMIT 3`).all();
   for (const f of fails) console.log(`   ✖ ${f.phone}: ${f.error_text ?? '—'}`);
 } else {

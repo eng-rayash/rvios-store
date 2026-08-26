@@ -19,6 +19,8 @@ export const ROOT = config.paths.root;
 export const DATA_DIR = config.paths.data;
 export const UPLOAD_DIR = config.paths.uploads;
 
+// المجلّد يُنشأ حتى مع التخزين السحابي: النسخ الاحتياطي
+// يقرأه، وقد تبقى صور قديمة من قبل التحويل.
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 connect(config.databaseUrl);

@@ -59,6 +59,38 @@ export function toPg(text) {
 const needsReturning = (s) => /^\s*INSERT\s/i.test(s) && !/\bRETURNING\b/i.test(s);
 
 /**
+ * ‏undefined ليس قيمة في Postgres — العميل يرفضها بـ UNDEFINED_VALUE.
+ * SQLite كان يقبلها ويكتبها NULL، وعشرات المواضع في المشروع
+ * تمرّر حقلاً غائباً بلا فحص. نُطبّقها هنا مرة واحدة بدل أن
+ * نُصلح كل موضع — وهو أيضاً ما كان يحدث فعلياً من قبل.
+ */
+const nullify = (params) => params.map((p) => (p === undefined ? null : p));
+
+/** اسم الجدول من جملة INSERT */
+const targetTable = (s) => (/^\s*INSERT\s+INTO\s+(?:public\.)?"?([a-z_]+)"?/i.exec(s) ?? [])[1] ?? '';
+
+/**
+ * أي الجداول تملك عمود id؟
+ *
+ * ثمانية جداول مفتاحها الأساسي نصّي لا رقماً مولّداً — visits
+ * وsessions وotps وplatform_settings وغيرها. إلحاق
+ * `RETURNING id` بها يرمي الخطأ 42703. نسأل القاعدة مرة واحدة
+ * ونُخزّن الإجابة، فلا قائمة مكتوبة يدوياً تتخلّف عن المخطّط.
+ */
+let idTables = null;
+async function tablesWithId() {
+  if (idTables) return idTables;
+  const rows = await raw().unsafe(
+    `SELECT table_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND column_name = 'id'`);
+  idTables = new Set(rows.map((r) => r.table_name));
+  return idTables;
+}
+
+/** يُبطل الذاكرة بعد تغيير المخطّط */
+export const forgetSchema = () => { idTables = null; };
+
+/**
  * الأعداد الكبيرة والعشرية تصل من Postgres كنصوص.
  * `COUNT(*) n` كان يعيد رقماً في SQLite ويعيد "5" هنا، فتنكسر
  * كل مقارنة حسابية بصمت. نُجبر التحويل عند الحدّ لا في كل
@@ -98,18 +130,20 @@ export const raw = () => {
 export const db = {
   prepare(text) {
     const q = toPg(text);
-    const query = needsReturning(q) ? `${q} RETURNING id` : q;
+    const wantsId = needsReturning(q);
+    const table = wantsId ? targetTable(q) : '';
 
     return {
       async all(...params) {
-        return [...await raw().unsafe(query, params)];
+        return [...await raw().unsafe(q, nullify(params))];
       },
       async get(...params) {
-        const rows = await raw().unsafe(query, params);
+        const rows = await raw().unsafe(q, nullify(params));
         return rows[0] ?? null;
       },
       async run(...params) {
-        const rows = await raw().unsafe(query, params);
+        const query = wantsId && (await tablesWithId()).has(table) ? `${q} RETURNING id` : q;
+        const rows = await raw().unsafe(query, nullify(params));
         return {
           changes: rows.count ?? 0,
           lastInsertRowid: rows[0]?.id ?? 0,
@@ -137,12 +171,14 @@ export const db = {
       const scoped = {
         prepare(text) {
           const q = toPg(text);
-          const query = needsReturning(q) ? `${q} RETURNING id` : q;
+          const wantsId = needsReturning(q);
+          const table = wantsId ? targetTable(q) : '';
           return {
-            async all(...p) { return [...await tx.unsafe(query, p)]; },
-            async get(...p) { const r = await tx.unsafe(query, p); return r[0] ?? null; },
+            async all(...p) { return [...await tx.unsafe(q, nullify(p))]; },
+            async get(...p) { const r = await tx.unsafe(q, nullify(p)); return r[0] ?? null; },
             async run(...p) {
-              const r = await tx.unsafe(query, p);
+              const query = wantsId && (await tablesWithId()).has(table) ? `${q} RETURNING id` : q;
+              const r = await tx.unsafe(query, nullify(p));
               return { changes: r.count ?? 0, lastInsertRowid: r[0]?.id ?? 0 };
             },
           };

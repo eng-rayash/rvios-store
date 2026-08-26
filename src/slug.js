@@ -116,25 +116,25 @@ export async function slugTaken(slug, exceptStoreId = 0) {
 }
 
 /** فحص فوري لتوفر الرابط (§٣.٢ — يمنع أكثر مصادر الإحباط شيوعاً) */
-export function checkSlug(raw, exceptStoreId = 0) {
+export async function checkSlug(raw, exceptStoreId = 0) {
   const slug = slugify(raw);
   const problem = slugProblem(slug);
   if (problem) return { slug, ok: false, reason: problem };
-  if (slugTaken(slug, exceptStoreId)) {
+  if (await slugTaken(slug, exceptStoreId)) {
     return { slug, ok: false, reason: 'هذا الرابط محجوز', taken: true };
   }
   return { slug, ok: true, reason: 'متاح' };
 }
 
 /** يقترح بديلاً متاحاً عند التعارض */
-export function suggestSlug(raw) {
+export async function suggestSlug(raw) {
   let base = slugify(raw);
   if (!base || base.length < 3) base = 'mystore';
 
-  if (!slugProblem(base) && !slugTaken(base)) return base;
+  if (!slugProblem(base) && !await slugTaken(base)) return base;
   for (let i = 2; i < 200; i++) {
     const candidate = `${base}-${i}`.slice(0, 30).replace(/-$/, '');
-    if (!slugProblem(candidate) && !slugTaken(candidate)) return candidate;
+    if (!slugProblem(candidate) && !await slugTaken(candidate)) return candidate;
   }
   return `${base.slice(0, 24)}-${Date.now().toString(36).slice(-4)}`;
 }
