@@ -16,13 +16,13 @@ import { saveImage } from '../uploads.js';
 import { ensureSubscription, planPrices } from '../billing.js';
 
 /** ملخّص متاجر التاجر لعقد الجلسة */
-function storeSummary(merchantId) {
-  const stores = db.prepare(`SELECT id, slug, name, logo, color, plan, status
+async function storeSummary(merchantId) {
+  const stores = await db.prepare(`SELECT id, slug, name, logo, color, plan, status
                              FROM stores WHERE merchant_id = ? ORDER BY id`).all(merchantId);
   return stores.map((s) => ({ ...s, url: `/${s.slug}` }));
 }
 
-export default function register(r) {
+export default async function register(r) {
 
   // ── ١. طلب رمز تحقق ───────────────────────────────────
   r.post('/api/auth/request-code', async (req, res) => {
@@ -79,7 +79,7 @@ export default function register(r) {
   });
 
   // ── ٣. من أنا ─────────────────────────────────────────
-  r.get('/api/auth/me', (req, res) => {
+  r.get('/api/auth/me', async (req, res) => {
     const m = currentMerchant(req);
     if (!m) return json(res, { authenticated: false });
 
@@ -99,13 +99,13 @@ export default function register(r) {
   });
 
   // ── ٤. خروج ───────────────────────────────────────────
-  r.post('/api/auth/logout', (req, res) => {
+  r.post('/api/auth/logout', async (req, res) => {
     destroySession(parseCookies(req)[SESSION_COOKIE]);
     json(res, { ok: true }, 200, { 'set-cookie': cookieHeader(SESSION_COOKIE, '', { clear: true }) });
   });
 
   // ── ٥. فحص فوري لتوفر الرابط (§٣.٢) ───────────────────
-  r.get('/api/slug/check', (req, res) => {
+  r.get('/api/slug/check', async (req, res) => {
     const raw = req.query.get('q') ?? '';
     if (!raw.trim()) return json(res, { slug: '', ok: false, reason: 'اكتب اسم متجرك' });
     const result = checkSlug(raw);
@@ -118,7 +118,7 @@ export default function register(r) {
     const body = await readBody(req);
 
     // خانات المتاجر: التاجر يبدأ بواحدة، والإضافية تُشترى (برو)
-    const owned = db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id).n;
+    const owned = await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id).n;
     if (owned >= (merchant.store_slots ?? 1)) {
       bad('بلغتَ عدد المتاجر المتاح في حسابك. اشترِ خانة متجر إضافي من قسم الاشتراك.', 'NO_STORE_SLOT');
     }
@@ -138,7 +138,7 @@ export default function register(r) {
      * بلا قيمة. الأول يبدأ بالمجانية كالمعتاد.
      */
     const inherited = owned === 0 ? 'basic'
-      : db.prepare(`SELECT plan FROM stores WHERE merchant_id = ?
+      : await db.prepare(`SELECT plan FROM stores WHERE merchant_id = ?
                     ORDER BY CASE plan WHEN 'pro' THEN 3 WHEN 'plus' THEN 2 ELSE 1 END DESC
                     LIMIT 1`).get(merchant.id)?.plan ?? 'basic';
 
@@ -164,19 +164,19 @@ export default function register(r) {
     const logo   = saveImage(storeId, 'logo', body.logo);
     const banner = saveImage(storeId, 'banner', body.banner);
     if (logo || banner) {
-      db.prepare('UPDATE stores SET logo = ?, banner = ? WHERE id = ?').run(logo, banner, storeId);
+      await db.prepare('UPDATE stores SET logo = ?, banner = ? WHERE id = ?').run(logo, banner, storeId);
     }
 
     // اسم التاجر يُكتب مرة واحدة — لا يُدهس عند إنشاء متجر ثانٍ
     if (!merchant.name && body.ownerName && owned === 0) {
-      db.prepare('UPDATE merchants SET name = ? WHERE id = ?').run(clean(body.ownerName, 60), merchant.id);
+      await db.prepare('UPDATE merchants SET name = ? WHERE id = ?').run(clean(body.ownerName, 60), merchant.id);
     }
 
     // منتج أول اختياري (§٣.٢ الخطوة ٦ — قابلة للتخطي)
     let firstProduct = null;
     if (body.product?.name) {
       const { scope } = await import('../tenancy.js');
-      firstProduct = scope(storeId).insert('products', {
+      firstProduct = await scope(storeId).insert('products', {
         name: clean(body.product.name, 100),
         price: Math.max(0, Number(body.product.price) || 0),
         qty: Math.max(0, Number(body.product.qty) || 1),
@@ -209,7 +209,7 @@ export default function register(r) {
     json(res, { ok: true }, 200, { 'set-cookie': cookieHeader(ADMIN_COOKIE, token, { maxAge: 60 * 60 * 12 }) });
   });
 
-  r.post('/api/admin/logout', (req, res) => {
+  r.post('/api/admin/logout', async (req, res) => {
     destroySession(parseCookies(req)[ADMIN_COOKIE]);
     json(res, { ok: true }, 200, { 'set-cookie': cookieHeader(ADMIN_COOKIE, '', { clear: true }) });
   });

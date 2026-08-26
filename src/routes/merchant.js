@@ -22,14 +22,14 @@ import {
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
-export default function register(r) {
+export default async function register(r) {
 
   // ── نظرة عامة (§٣.٣ — الطلبات المعلّقة أولاً) ──────────
-  r.get('/api/me/overview', (req, res) => {
+  r.get('/api/me/overview', async (req, res) => {
     const { store } = requireStore(req);
     const s = scope(store.id);
 
-    const productCount = s.count('products', {});
+    const productCount = await s.count('products', {});
     const plan = planOf(store);
 
     // زيارات آخر ٧ أيام
@@ -38,10 +38,10 @@ export default function register(r) {
       const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
       days.push(d);
     }
-    const visitRows = s.all('visits', {});
+    const visitRows = await s.all('visits', {});
     const visitMap = Object.fromEntries(visitRows.map((v) => [v.day, v.count]));
 
-    const ordersByDay = s.raw(
+    const ordersByDay = await s.raw(
       `SELECT substr(created_at,1,10) d, COUNT(*) n FROM orders
        WHERE store_id = ? AND substr(created_at,1,10) >= ?
        GROUP BY d`, [store.id, days[0]],
@@ -49,7 +49,7 @@ export default function register(r) {
     const orderMap = Object.fromEntries(ordersByDay.map((o) => [o.d, o.n]));
 
     const monthStart = new Date().toISOString().slice(0, 7);
-    const confirmed = s.raw(
+    const confirmed = await s.raw(
       `SELECT COALESCE(SUM(total),0) sum FROM orders
        WHERE store_id = ? AND status IN ('ok','done') AND substr(created_at,1,7) = ?`,
       [store.id, monthStart],
@@ -58,9 +58,9 @@ export default function register(r) {
     json(res, {
       store: publicStore(store),
       kpis: {
-        pending:   s.count('orders', { status: 'wait' }),
+        pending:   await s.count('orders', { status: 'wait' }),
         visits:    days.reduce((a, d) => a + (visitMap[d] ?? 0), 0),
-        products:  s.count('products', { live: 1 }),
+        products:  await s.count('products', { live: 1 }),
         confirmed,
       },
       chart: days.map((d) => ({ day: d, visits: visitMap[d] ?? 0, orders: orderMap[d] ?? 0 })),
@@ -70,7 +70,7 @@ export default function register(r) {
         label: capacityLabel(store, productCount),
         pct: plan.products === Infinity ? 0 : Math.min(100, Math.round((productCount / plan.products) * 100)),
       },
-      recent: s.all('orders', {}, { order: 'created_at DESC', limit: 4 })
+      recent: await s.all('orders', {}, { order: 'created_at DESC', limit: 4 })
                .map((o) => withItems(store.id, o)),
     });
   });
@@ -84,19 +84,19 @@ export default function register(r) {
    */
   const ORDERS_PER_PAGE = 50;
 
-  r.get('/api/me/orders', (req, res) => {
+  r.get('/api/me/orders', async (req, res) => {
     const { store } = requireStore(req);
     const s = scope(store.id);
 
     const status = req.query.get('status');
     const where = status && ORDER_STATES[status] ? { status } : {};
 
-    const total = s.count('orders', where);
+    const total = await s.count('orders', where);
     const pages = Math.max(1, Math.ceil(total / ORDERS_PER_PAGE));
     // الصفحة تُقصَر على المدى الصالح: طلب صفحة ٩٩٩ يعيد الأخيرة
     const page = Math.min(Math.max(1, toInt(req.query.get('page')) || 1), pages);
 
-    const rows = s.all('orders', where, {
+    const rows = await s.all('orders', where, {
       order: 'created_at DESC',
       limit: ORDERS_PER_PAGE,
       offset: (page - 1) * ORDERS_PER_PAGE,
@@ -111,9 +111,10 @@ export default function register(r) {
       pages,
       total,
       perPage: ORDERS_PER_PAGE,
-      counts: Object.fromEntries(
-        Object.keys(ORDER_STATES).map((k) => [k, s.count('orders', { status: k })]),
-      ),
+      // map غير متزامنة تعيد وعوداً — Promise.all تنتظرها معاً
+      counts: Object.fromEntries(await Promise.all(
+        Object.keys(ORDER_STATES).map(async (k) => [k, await s.count('orders', { status: k })]),
+      )),
     });
   });
 
@@ -125,11 +126,11 @@ export default function register(r) {
   });
 
   // ── المنتجات ──────────────────────────────────────────
-  r.get('/api/me/products', (req, res) => {
+  r.get('/api/me/products', async (req, res) => {
     const { store } = requireStore(req);
     const s = scope(store.id);
-    const products = s.all('products', {}, { order: 'sort, id DESC' });
-    const cats = s.all('categories', {}, { order: 'sort, id' });
+    const products = await s.all('products', {}, { order: 'sort, id DESC' });
+    const cats = await s.all('categories', {}, { order: 'sort, id' });
     const catName = Object.fromEntries(cats.map((c) => [c.id, c.name]));
     const plan = planOf(store);
     json(res, {
@@ -153,42 +154,44 @@ export default function register(r) {
     const s = scope(store.id);
 
     // §٢.٢ — حدّ الباقة يُفرض في الخادم لا في الواجهة
-    const count = s.count('products', {});
+    const count = await s.count('products', {});
     if (!canAddProduct(store, count)) {
       const plan = planOf(store);
       bad(`بلغتَ حد باقة ${plan.name} (${plan.products} منتجات). رقّ باقتك لإضافة المزيد.`, 'PLAN_LIMIT');
     }
 
     const body = await readBody(req);
-    const id = s.insert('products', productFields(body, s, true));
+    const id = await s.insert('products', productFields(body, s, true));
     applyGallery(s, store, id, body);
-    json(res, { ok: true, product: withGallery(s, s.get('products', { id })) }, 201);
+    json(res, { ok: true, product: withGallery(s, await s.get('products', { id })) }, 201);
   });
 
   r.patch('/api/me/products/:id', async (req, res) => {
     const { store } = requireStore(req);
     const s = scope(store.id);
     const id = toInt(req.params.id);
-    if (!s.get('products', { id })) notFound('المنتج غير موجود');
+    if (!await s.get('products', { id })) notFound('المنتج غير موجود');
     const body = await readBody(req);
-    s.update('products', id, productFields(body, s, false));
+    await s.update('products', id, productFields(body, s, false));
     applyGallery(s, store, id, body);
-    json(res, { ok: true, product: withGallery(s, s.get('products', { id })) });
+    json(res, { ok: true, product: withGallery(s, await s.get('products', { id })) });
   });
 
-  r.delete('/api/me/products/:id', (req, res) => {
+  r.delete('/api/me/products/:id', async (req, res) => {
     const { store } = requireStore(req);
-    const n = scope(store.id).remove('products', toInt(req.params.id));
+    const n = await scope(store.id).remove('products', toInt(req.params.id));
     if (!n) notFound('المنتج غير موجود');
     json(res, { ok: true });
   });
 
   // ── التصنيفات ─────────────────────────────────────────
-  r.get('/api/me/categories', (req, res) => {
+  r.get('/api/me/categories', async (req, res) => {
     const { store } = requireStore(req);
     const s = scope(store.id);
-    const cats = s.all('categories', {}, { order: 'sort, id' });
-    json(res, cats.map((c) => ({ ...c, count: s.count('products', { category_id: c.id }) })));
+    const cats = await s.all('categories', {}, { order: 'sort, id' });
+    json(res, await Promise.all(
+      cats.map(async (c) => ({ ...c, count: await s.count('products', { category_id: c.id }) })),
+    ));
   });
 
   r.post('/api/me/categories', async (req, res) => {
@@ -204,38 +207,38 @@ export default function register(r) {
       if (!planOf(store).subcategories) {
         bad(`التصنيفات الفرعية متاحة في باقتي ${PLANS.plus.name} و${PLANS.pro.name}`, 'PLAN_LIMIT');
       }
-      const p = s.get('categories', { id: toInt(body.parentId) });
+      const p = await s.get('categories', { id: toInt(body.parentId) });
       if (!p) bad('التصنيف الأب غير موجود');
       parent = p.id;
     }
 
-    const sort = toInt(body.sort, s.count('categories', {}) + 1);
-    const id = s.insert('categories', { name, parent_id: parent, sort });
-    json(res, { ok: true, category: s.get('categories', { id }) }, 201);
+    const sort = toInt(body.sort, await s.count('categories', {}) + 1);
+    const id = await s.insert('categories', { name, parent_id: parent, sort });
+    json(res, { ok: true, category: await s.get('categories', { id }) }, 201);
   });
 
   r.patch('/api/me/categories/:id', async (req, res) => {
     const { store } = requireStore(req);
     const s = scope(store.id);
     const id = toInt(req.params.id);
-    if (!s.get('categories', { id })) notFound('التصنيف غير موجود');
+    if (!await s.get('categories', { id })) notFound('التصنيف غير موجود');
     const body = await readBody(req);
     const patch = {};
     if (body.name !== undefined) patch.name = clean(body.name, 40);
     if (body.sort !== undefined) patch.sort = toInt(body.sort);
-    s.update('categories', id, patch);
-    json(res, { ok: true, category: s.get('categories', { id }) });
+    await s.update('categories', id, patch);
+    json(res, { ok: true, category: await s.get('categories', { id }) });
   });
 
-  r.delete('/api/me/categories/:id', (req, res) => {
+  r.delete('/api/me/categories/:id', async (req, res) => {
     const { store } = requireStore(req);
-    const n = scope(store.id).remove('categories', toInt(req.params.id));
+    const n = await scope(store.id).remove('categories', toInt(req.params.id));
     if (!n) notFound('التصنيف غير موجود');
     json(res, { ok: true });
   });
 
   // ── إعدادات المتجر (§٣.٣) ─────────────────────────────
-  r.get('/api/me/store', (req, res) => {
+  r.get('/api/me/store', async (req, res) => {
     const { store } = requireStore(req);
     json(res, {
       store: publicStore(store),
@@ -293,33 +296,28 @@ export default function register(r) {
       patch.slug = check.slug;
     }
 
-    db.exec('BEGIN IMMEDIATE');
-    try {
+    await db.transaction(async (tx) => {
       // §٣.٣ — نحفظ الرابط القديم قبل تغييره ليبقى يعمل بتحويل ٣٠١
       if (patch.slug) {
-        db.prepare(`INSERT INTO store_slug_history (old_slug, store_id, changed_at)
+        await tx.prepare(`INSERT INTO store_slug_history (old_slug, store_id, changed_at)
                     VALUES (?,?,?) ON CONFLICT(old_slug) DO UPDATE
                     SET store_id = excluded.store_id, changed_at = excluded.changed_at`)
           .run(store.slug, store.id, now());
         // لو كان الرابط الجديد مستخدماً سابقاً لهذا المتجر، نحرّره من السجل
-        db.prepare('DELETE FROM store_slug_history WHERE old_slug = ?').run(patch.slug);
+        await tx.prepare('DELETE FROM store_slug_history WHERE old_slug = ?').run(patch.slug);
       }
-      db.prepare(`UPDATE stores SET ${Object.keys(patch).map((k) => `${k} = ?`).join(',')} WHERE id = ?`)
+      await tx.prepare(`UPDATE stores SET ${Object.keys(patch).map((k) => `${k} = ?`).join(',')} WHERE id = ?`)
         .run(...Object.values(patch), store.id);
-      db.exec('COMMIT');
-    } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
-    }
+    });
 
-    json(res, { ok: true, store: publicStore(db.prepare('SELECT * FROM stores WHERE id = ?').get(store.id)) });
+    json(res, { ok: true, store: publicStore(await db.prepare('SELECT * FROM stores WHERE id = ?').get(store.id)) });
   });
 
   // ── الاشتراك (§٣.٣) ───────────────────────────────────
-  r.get('/api/me/plan', (req, res) => {
+  r.get('/api/me/plan', async (req, res) => {
     const { store } = requireStore(req);
     const s = scope(store.id);
-    const used = s.count('products', {});
+    const used = await s.count('products', {});
     json(res, {
       current: planOf(store),
       all: Object.values(PLANS).map((p) => ({
@@ -341,10 +339,10 @@ export default function register(r) {
     if (!['build', 'domain', 'store', 'verify', 'upgrade'].includes(kind)) bad('نوع الطلب غير معروف');
 
     const s = scope(store.id);
-    if (s.get('service_requests', { kind, status: 'open' })) {
+    if (await s.get('service_requests', { kind, status: 'open' })) {
       bad('لديك طلب مفتوح من هذا النوع — سنتواصل معك قريباً');
     }
-    s.insert('service_requests', {
+    await s.insert('service_requests', {
       kind,
       contact: clean(body.contact, 60) || store.whatsapp,
       detail: clean(body.detail, 500),
@@ -354,17 +352,17 @@ export default function register(r) {
     json(res, { ok: true, message: 'وصلنا طلبك — سنتواصل معك عبر واتساب' }, 201);
   });
 
-  r.get('/api/me/requests', (req, res) => {
+  r.get('/api/me/requests', async (req, res) => {
     const { store } = requireStore(req);
-    json(res, scope(store.id).all('service_requests', {}, { order: 'created_at DESC' }));
+    json(res, await scope(store.id).all('service_requests', {}, { order: 'created_at DESC' }));
   });
 
   // ═══ الفوترة (§٥) ═════════════════════════════════════
-  r.get('/api/me/billing', (req, res) => {
+  r.get('/api/me/billing', async (req, res) => {
     const { store } = requireStore(req);
     const s = scope(store.id);
     const plan = planOf(store);
-    const used = s.count('products', {});
+    const used = await s.count('products', {});
 
     json(res, {
       subscription: subscriptionOf(store),
@@ -372,7 +370,7 @@ export default function register(r) {
       addons: addonPrices(),
       methods: paymentMethods(),
       yearlyMonthsFree: YEARLY_MONTHS_FREE(),
-      invoices: s.all('invoices', {}, { order: 'created_at DESC', limit: 50 }),
+      invoices: await s.all('invoices', {}, { order: 'created_at DESC', limit: 50 }),
       // §٥.٥ — كم منتجاً مخفي بسبب حد الباقة (مخفي لا محذوف)
       hidden: hiddenByPlanCount(store, plan.products),
       products: { used, limit: plan.products === Infinity ? null : plan.products },
@@ -403,13 +401,13 @@ export default function register(r) {
     json(res, {
       ok: true,
       invoice,
-      subscription: subscriptionOf(db.prepare('SELECT * FROM stores WHERE id = ?').get(store.id)),
+      subscription: subscriptionOf(await db.prepare('SELECT * FROM stores WHERE id = ?').get(store.id)),
       message: 'وصلنا إيصالك وفُعّلت باقتك فوراً. سنراجعه خلال يوم عمل.',
     });
   });
 
   // ═══ المتاجر المتعددة (برو) ═══════════════════════════
-  r.get('/api/me/stores', (req, res) => {
+  r.get('/api/me/stores', async (req, res) => {
     const { merchant, store, stores } = requireStore(req);
     json(res, {
       active: store.id,
@@ -456,7 +454,7 @@ export default function register(r) {
       bad('لا يمكن حذف متجرك الوحيد — احذف الحساب بدلاً من ذلك', 'LAST_STORE');
     }
 
-    db.prepare('DELETE FROM stores WHERE id = ? AND merchant_id = ?').run(id, merchant.id);
+    await db.prepare('DELETE FROM stores WHERE id = ? AND merchant_id = ?').run(id, merchant.id);
     dropStoreImages(id);
     json(res, { ok: true, message: `حُذف متجر «${target.name}»` });
   });
@@ -482,17 +480,12 @@ export default function register(r) {
       .all(merchant.id).map((s) => s.id);
 
     // الحذف بترتيب يحترم المفاتيح الأجنبية؛ ON DELETE CASCADE يتكفّل بالتوابع
-    db.exec('BEGIN IMMEDIATE');
-    try {
-      db.prepare('DELETE FROM stores WHERE merchant_id = ?').run(merchant.id);
-      db.prepare('DELETE FROM sessions WHERE merchant_id = ?').run(merchant.id);
-      db.prepare('DELETE FROM otps WHERE phone = ?').run(merchant.phone);
-      db.prepare('DELETE FROM merchants WHERE id = ?').run(merchant.id);
-      db.exec('COMMIT');
-    } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
-    }
+    await db.transaction(async (tx) => {
+      await tx.prepare('DELETE FROM stores WHERE merchant_id = ?').run(merchant.id);
+      await tx.prepare('DELETE FROM sessions WHERE merchant_id = ?').run(merchant.id);
+      await tx.prepare('DELETE FROM otps WHERE phone = ?').run(merchant.phone);
+      await tx.prepare('DELETE FROM merchants WHERE id = ?').run(merchant.id);
+    });
 
     for (const id of storeIds) dropStoreImages(id);
 
@@ -505,11 +498,11 @@ export default function register(r) {
 // ── مساعدات ────────────────────────────────────────────
 
 /** يحفظ معرض الصور ويحدّث الغلاف، ضمن حد الباقة */
-function applyGallery(s, store, productId, body) {
+async function applyGallery(s, store, productId, body) {
   if (body.images === undefined) return;
   const max = planOf(store).imagesPerProduct;
   const cover = syncGallery(s, productId, body.images, max);
-  s.update('products', productId, { image: cover });
+  await s.update('products', productId, { image: cover });
 }
 
 /** يضيف مصفوفة الصور إلى صف المنتج */
@@ -517,7 +510,7 @@ function withGallery(s, product) {
   return { ...product, images: galleryOf(s, product) };
 }
 
-function productFields(body, s, isNew) {
+async function productFields(body, s, isNew) {
   const f = {};
   if (body.name        !== undefined) f.name        = clean(body.name, 100);
   if (body.summary     !== undefined) f.summary     = clean(body.summary, 120);
@@ -536,7 +529,7 @@ function productFields(body, s, isNew) {
   if (body.categoryId !== undefined) {
     const cid = toInt(body.categoryId);
     // التصنيف يجب أن يكون من نفس المتجر — يفرضه scope تلقائياً
-    f.category_id = cid && s.get('categories', { id: cid }) ? cid : null;
+    f.category_id = cid && await s.get('categories', { id: cid }) ? cid : null;
   }
 
   if (isNew) {

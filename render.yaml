@@ -1,0 +1,77 @@
+# ═══════════════════════════════════════════════════════════
+#  مخطّط نشر Render
+#
+#  الاستعمال: ادفع المستودع إلى GitHub، ثم في Render:
+#      New → Blueprint → اختر المستودع
+#  يقرأ هذا الملف فيُنشئ الخدمة والقاعدة والقرص معاً.
+#
+#  ما لا يفعله: الأسرار. تُملأ يدوياً من لوحة Render
+#  (Environment) — sync:false أدناه تعني «اسألني عنها».
+# ═══════════════════════════════════════════════════════════
+
+databases:
+  - name: rvios-db
+    databaseName: rvios
+    user: rvios
+    plan: free                    # للتجربة؛ ارفعها قبل أول تاجر حقيقي
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: rvios-store
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health      # الخادم يستعلم القاعدة فيه، لا يكتفي بالمنفذ
+    autoDeploy: true
+
+    # ── قرص دائم ──────────────────────────────────────────
+    # القاعدة خارجية، لكن **صور المتاجر** ملفات على القرص.
+    # بلا هذا القرص تُمحى كل صورة رفعها تاجر مع أول إعادة نشر.
+    disk:
+      name: rvios-data
+      mountPath: /data
+      sizeGB: 5
+
+    envVars:
+      # الرابط يُحقن من القاعدة أعلاه — لا يُكتب بخط اليد
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rvios-db
+          property: connectionString
+
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /data
+      - key: LOG_JSON
+        value: "1"
+
+      # النسخ الاحتياطي: Render يوفّر استعادة زمنية للقاعدة،
+      # ونحن ننسخ الصور. pg_dump متاح في الصورة.
+      - key: BACKUP_ENABLED
+        value: "1"
+
+      # ── أسرار: تُملأ من لوحة Render، لا من هذا الملف ──
+      - key: RVIOS_ADMIN_PASS
+        sync: false
+      - key: OTP_PEPPER
+        sync: false
+      - key: VISIT_SALT
+        sync: false
+      - key: PUBLIC_URL
+        sync: false
+
+      # ── واتساب (اختيارية حتى تُفعّل الإرسال) ──
+      - key: OTP_PROVIDER
+        value: console
+      - key: META_TOKEN
+        sync: false
+      - key: WA_PHONE_ID
+        sync: false
+      - key: WA_VERIFY_TOKEN
+        sync: false
+      - key: META_APP_SECRET
+        sync: false

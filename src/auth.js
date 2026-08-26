@@ -84,8 +84,8 @@ export function issueOtp(phone) {
  * منفصلة عن حد المعدل: الحد يمنع الإساءة، والمهلة تمنع
  * ضغط الزر مرتين فيستهلك التاجر رصيد رسائلك بلا قصد.
  */
-export function assertResendAllowed(phone) {
-  const row = db.prepare('SELECT expires_at FROM otps WHERE phone = ?').get(phone);
+export async function assertResendAllowed(phone) {
+  const row = await db.prepare('SELECT expires_at FROM otps WHERE phone = ?').get(phone);
   if (!row) return;
   const issuedAt = new Date(row.expires_at).getTime() - OTP_TTL_MS;
   const waited = Date.now() - issuedAt;
@@ -108,34 +108,34 @@ export async function sendOtp(phone, code) {
  * خاطئ، أو مستهلَك. التمييز بينها يحوّل نقطة الدخول إلى أداة
  * تكشف أي الأرقام مسجّلة وأيها في منتصف تدفق تحقق.
  */
-export function verifyOtp(phone, code) {
+export async function verifyOtp(phone, code) {
   const FAIL = () => new HttpError(400, 'الرمز غير صحيح أو منتهي الصلاحية');
 
-  const row = db.prepare('SELECT * FROM otps WHERE phone = ?').get(phone);
+  const row = await db.prepare('SELECT * FROM otps WHERE phone = ?').get(phone);
   if (!row) throw FAIL();
 
   if (row.expires_at < now() || row.attempts >= config.otp.maxAttempts) {
-    db.prepare('DELETE FROM otps WHERE phone = ?').run(phone);
+    await db.prepare('DELETE FROM otps WHERE phone = ?').run(phone);
     throw FAIL();
   }
 
   // العدّاد يزيد قبل المقارنة، فلا تُستنزف المحاولات بطلبات متوازية
-  db.prepare('UPDATE otps SET attempts = attempts + 1 WHERE phone = ?').run(phone);
+  await db.prepare('UPDATE otps SET attempts = attempts + 1 WHERE phone = ?').run(phone);
 
   if (!sameHash(row.code, hashCode(String(code).trim()))) throw FAIL();
 
   // الاستهلاك يمنع إعادة استخدام الرمز نفسه
-  db.prepare('DELETE FROM otps WHERE phone = ?').run(phone);
+  await db.prepare('DELETE FROM otps WHERE phone = ?').run(phone);
   return true;
 }
 
 // ── التجار والجلسات ──────────────────────────────────────
-export function findOrCreateMerchant(phone) {
-  const found = db.prepare('SELECT * FROM merchants WHERE phone = ?').get(phone);
+export async function findOrCreateMerchant(phone) {
+  const found = await db.prepare('SELECT * FROM merchants WHERE phone = ?').get(phone);
   if (found) return found;
   const res = db.prepare('INSERT INTO merchants (phone, name, created_at) VALUES (?, ?, ?)')
                 .run(phone, '', now());
-  return db.prepare('SELECT * FROM merchants WHERE id = ?').get(Number(res.lastInsertRowid));
+  return await db.prepare('SELECT * FROM merchants WHERE id = ?').get(Number(res.lastInsertRowid));
 }
 
 export function createSession(merchantId, kind = 'merchant') {
@@ -153,21 +153,21 @@ export function createAdminSession() {
   return token;
 }
 
-export function destroySession(token) {
-  if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+export async function destroySession(token) {
+  if (token) await db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
 }
 
 /** التاجر الحالي أو null */
-export function currentMerchant(req) {
+export async function currentMerchant(req) {
   const token = parseCookies(req)[SESSION_COOKIE];
   if (!token) return null;
-  const s = db.prepare('SELECT * FROM sessions WHERE token = ? AND kind = ?').get(token, 'merchant');
+  const s = await db.prepare('SELECT * FROM sessions WHERE token = ? AND kind = ?').get(token, 'merchant');
   if (!s) return null;
   if (s.expires_at < now()) {
-    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    await db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
     return null;
   }
-  return db.prepare('SELECT * FROM merchants WHERE id = ?').get(s.merchant_id) ?? null;
+  return await db.prepare('SELECT * FROM merchants WHERE id = ?').get(s.merchant_id) ?? null;
 }
 
 export function requireMerchant(req) {
@@ -177,22 +177,22 @@ export function requireMerchant(req) {
 }
 
 /** كل متاجر التاجر، الأقدم أولاً */
-export function storesOf(merchantId) {
-  return db.prepare('SELECT * FROM stores WHERE merchant_id = ? ORDER BY id').all(merchantId);
+export async function storesOf(merchantId) {
+  return await db.prepare('SELECT * FROM stores WHERE merchant_id = ? ORDER BY id').all(merchantId);
 }
 
 /** المتجر المثبَّت في هذه الجلسة، إن وُجد */
-function sessionActiveStore(req) {
+async function sessionActiveStore(req) {
   const token = parseCookies(req)[SESSION_COOKIE];
   if (!token) return null;
-  const row = db.prepare('SELECT active_store_id FROM sessions WHERE token = ?').get(token);
+  const row = await db.prepare('SELECT active_store_id FROM sessions WHERE token = ?').get(token);
   return row?.active_store_id ?? null;
 }
 
 /** يثبّت المتجر النشط على الجلسة الحالية */
-export function setActiveStore(req, storeId) {
+export async function setActiveStore(req, storeId) {
   const token = parseCookies(req)[SESSION_COOKIE];
-  if (token) db.prepare('UPDATE sessions SET active_store_id = ? WHERE token = ?').run(storeId, token);
+  if (token) await db.prepare('UPDATE sessions SET active_store_id = ? WHERE token = ?').run(storeId, token);
 }
 
 /**
@@ -225,10 +225,10 @@ export function requireStore(req) {
 }
 
 // ── الإدارة ──────────────────────────────────────────────
-export function isAdmin(req) {
+export async function isAdmin(req) {
   const token = parseCookies(req)[ADMIN_COOKIE];
   if (!token) return false;
-  const s = db.prepare('SELECT * FROM sessions WHERE token = ? AND kind = ?').get(token, 'admin');
+  const s = await db.prepare('SELECT * FROM sessions WHERE token = ? AND kind = ?').get(token, 'admin');
   return !!s && s.expires_at >= now();
 }
 
@@ -236,11 +236,11 @@ export function requireAdmin(req) {
   if (!isAdmin(req)) throw new HttpError(401, 'يلزم دخول الإدارة');
 }
 
-export function cleanupExpired() {
-  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now());
-  db.prepare('DELETE FROM otps WHERE expires_at < ?').run(now());
-  db.prepare('DELETE FROM rate_limits WHERE reset_at < ?').run(now());
+export async function cleanupExpired() {
+  await db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now());
+  await db.prepare('DELETE FROM otps WHERE expires_at < ?').run(now());
+  await db.prepare('DELETE FROM rate_limits WHERE reset_at < ?').run(now());
   // بصمات الزيارة لا تُحتفظ أكثر من يومين
   const cutoff = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
-  db.prepare('DELETE FROM visit_marks WHERE day < ?').run(cutoff);
+  await db.prepare('DELETE FROM visit_marks WHERE day < ?').run(cutoff);
 }

@@ -8,6 +8,8 @@ data/
 # لا لزوم لها في الإنتاج
 test/
 node_modules/
+# القفل يدخل: npm ci يحتاجه
+!package-lock.json
 *.md
 !README.md
 .git/

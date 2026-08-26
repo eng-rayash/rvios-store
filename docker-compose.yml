@@ -1,0 +1,63 @@
+# ═══════════════════════════════════════════════════════════
+#  RVIOS Store — تشغيل محلي كامل
+#
+#      cp .env.example .env && npm run secrets   # املأ الأسرار
+#      docker compose up -d
+#      docker compose exec app npm run reset     # بيانات أولية
+#
+#  القاعدة هنا داخل compose للتطوير. في الإنتاج على منصّة
+#  مُدارة تُحذف خدمة db ويُمرَّر DATABASE_URL الخارجي.
+# ═══════════════════════════════════════════════════════════
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rvios
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rvios-dev-only}
+      POSTGRES_DB: rvios
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # المنفذ مكشوف للمضيف للتطوير وحده — احذفه في الإنتاج
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      # التطبيق يُقلع بمجرّد أن تقبل القاعدة الاتصال، لا قبله
+      test: ["CMD-SHELL", "pg_isready -U rvios -d rvios"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://rvios:${POSTGRES_PASSWORD:-rvios-dev-only}@db:5432/rvios?sslmode=disable
+      # الأسرار من .env — لا قيم افتراضية هنا كي يفشل الإقلاع
+      # بوضوح بدل أن يعمل بسرّ معروف
+      RVIOS_ADMIN_PASS: ${RVIOS_ADMIN_PASS:?ولّده بـ npm run secrets}
+      OTP_PEPPER: ${OTP_PEPPER:?ولّده بـ npm run secrets}
+      VISIT_SALT: ${VISIT_SALT:?ولّده بـ npm run secrets}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      OTP_PROVIDER: ${OTP_PROVIDER:-console}
+      META_TOKEN: ${META_TOKEN:-}
+      WA_PHONE_ID: ${WA_PHONE_ID:-}
+      WA_VERIFY_TOKEN: ${WA_VERIFY_TOKEN:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-1}
+    volumes:
+      # الصور المرفوعة والنسخ — تنجو من استبدال الحاوية
+      - appdata:/data
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  appdata:

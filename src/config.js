@@ -75,12 +75,18 @@ export const config = {
   port: int('PORT', 3000, { min: 1, max: 65535 }),
   host: env.HOST ?? '0.0.0.0',
 
+  /**
+   * رابط PostgreSQL. لا قيمة افتراضية في الإنتاج: قاعدة
+   * خاطئة أسوأ من غياب القاعدة — الأولى تكتب في مكان لا
+   * يعرفه أحد، والثانية توقف الإقلاع بخطأ واضح.
+   */
+  databaseUrl: env.DATABASE_URL ?? (isProd ? '' : 'postgresql://postgres:postgres@localhost:5432/rvios?sslmode=disable'),
+
   paths: {
     root: ROOT,
     public: path.join(ROOT, 'public'),
     data: env.DATA_DIR ?? path.join(ROOT, 'data'),
     get uploads() { return path.join(this.data, 'uploads'); },
-    get db() { return path.join(this.data, 'rvios.db'); },
     get backups() { return env.BACKUP_DIR ?? path.join(this.data, 'backups'); },
   },
 
@@ -199,6 +205,27 @@ if (isProd) {
   }
   if (!config.otp.pepper) {
     errors.push('OTP_PEPPER مطلوب في الإنتاج — بدونه تفقد تجزئة الرموز قيمتها');
+  }
+
+  /**
+   * قوة الأسرار لا وجودها فقط.
+   * كان الفحص يقبل RVIOS_ADMIN_PASS=admin وOTP_PEPPER=x في
+   * الإنتاج: سرّ موجود لكنه يُخمَّن في ثوانٍ. لوحة الإدارة
+   * تحكم المنصة كلها، وكلمة مرور من خمسة أحرف ليست حراسة.
+   */
+  const weak = (v) => !v || v.length < 16 || /^(admin|password|rvios|123456|changeme|secret|test)/i.test(v);
+
+  if (weak(config.admin.password)) {
+    errors.push('RVIOS_ADMIN_PASS ضعيف — ١٦ محرفاً على الأقل وغير متوقّع. ولّده بـ npm run secrets');
+  }
+  if (config.otp.pepper && config.otp.pepper.length < 32) {
+    errors.push('OTP_PEPPER قصير — ٣٢ محرفاً على الأقل. ولّده بـ npm run secrets');
+  }
+  if (env.VISIT_SALT && env.VISIT_SALT.length < 16) {
+    errors.push('VISIT_SALT قصير — ١٦ محرفاً على الأقل. ولّده بـ npm run secrets');
+  }
+  if (!config.databaseUrl) {
+    errors.push('DATABASE_URL مطلوب — رابط قاعدة PostgreSQL');
   }
   if (!env.VISIT_SALT) {
     warnings.push('VISIT_SALT غير مضبوط — سيتغيّر عند كل إعادة تشغيل فتتضخّم أرقام الزوّار');

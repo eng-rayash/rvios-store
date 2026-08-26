@@ -1,23 +1,26 @@
 # ═══════════════════════════════════════════════════════════
 #  RVIOS Store
-#  بلا اعتماديات خارجية — الصورة هي Node وحدها والمصدر.
-#  لا npm install، لا node_modules، لا شجرة اعتماديات تُدقَّق.
+#  اعتمادية واحدة: عميل postgres (بلا اعتماديات متعدّية).
+#  الشجرة تبقى قابلة للتدقيق بنظرة واحدة: npm ls --all
 # ═══════════════════════════════════════════════════════════
 FROM node:24-alpine
 
-# node:sqlite تحتاج libstdc++ على alpine
-RUN apk add --no-cache libstdc++ tini
+# tini للإشارات · postgresql-client لـ pg_dump والاستعادة
+RUN apk add --no-cache tini postgresql-client
 
 WORKDIR /app
 
+# الاعتماديات في طبقة منفصلة: لا يُعاد تنزيلها ما لم يتغيّر القفل
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev --no-audit --no-fund
+
 # المصدر فقط — انظر .dockerignore
-COPY package.json ./
 COPY src/ ./src/
 COPY public/ ./public/
 COPY ops/ ./ops/
 
-# البيانات في حجم منفصل: الحاوية تُستبدل عند كل نشر،
-# والقاعدة والصور يجب أن تنجو من الاستبدال.
+# الصور المرفوعة والنسخ في حجم منفصل: الحاوية تُستبدل عند
+# كل نشر، والصور يجب أن تنجو. القاعدة صارت خارجية (Postgres).
 RUN mkdir -p /data && chown -R node:node /data /app
 VOLUME ["/data"]
 ENV DATA_DIR=/data

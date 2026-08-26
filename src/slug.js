@@ -107,11 +107,11 @@ export function slugProblem(slug) {
  * لمتجر آخر: إعطاؤه لتاجر جديد يحوّل زبائن المتجر الأول إليه
  * — وهو انتحال فعلي لا مجرد تعارض أسماء (§٣.٣).
  */
-export function slugTaken(slug, exceptStoreId = 0) {
-  const live = db.prepare('SELECT id FROM stores WHERE slug = ?').get(slug);
+export async function slugTaken(slug, exceptStoreId = 0) {
+  const live = await db.prepare('SELECT id FROM stores WHERE slug = ?').get(slug);
   if (live && live.id !== exceptStoreId) return true;
 
-  const retired = db.prepare('SELECT store_id FROM store_slug_history WHERE old_slug = ?').get(slug);
+  const retired = await db.prepare('SELECT store_id FROM store_slug_history WHERE old_slug = ?').get(slug);
   return !!retired && retired.store_id !== exceptStoreId;
 }
 

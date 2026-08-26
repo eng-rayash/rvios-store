@@ -5,16 +5,19 @@
 //  الاشتراكات) وصور المتاجر. فقدان أيّها ليس عطلاً يُصلَح —
 //  هو خسارة عمل تاجرٍ بأكمله، ولا سبيل لإعادته.
 //
-//  القاعدة تُنسخ بـ VACUUM INTO لا بنسخ الملف: النسخ العادي
-//  أثناء كتابة جارية يُنتج ملفاً ممزّقاً يبدو سليماً حتى تحتاجه.
-//  VACUUM INTO يُنتج لقطة متّسقة من داخل SQLite نفسها.
+//  القاعدة تُنسخ بـ pg_dump: لقطة منطقية متّسقة تُستعاد على
+//  أي خادم Postgres، لا نسخة ثنائية مرتبطة بإصدار بعينه.
+//
+//  إن غاب pg_dump من المضيف (الشائع على منصّة مُدارة) تُنسخ
+//  الصور وحدها ويُسجَّل التخطّي صراحةً — لا نُظهر نسخة نصفية
+//  على أنها كاملة. نسخ القاعدة عندئذٍ مسؤولية المزوّد.
 //
 //  الصور تُنسخ تزايدياً: أسماؤها بصمات محتوى، فالملف الموجود
 //  في النسخة صحيح بالتأكيد ولا يحتاج إعادة نسخ.
 // ═══════════════════════════════════════════════════════════
 import fs from 'node:fs';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { spawn } from 'node:child_process';
 import { db } from './db.js';
 import { config } from './config.js';
 import { log } from './logger.js';
@@ -31,28 +34,45 @@ function ensureDir(dir) {
  * نسخة لم تُفتح قط ليست نسخة احتياطية — هي رجاء. نفتحها
  * ونعدّ صفوفها الآن، لا يوم الكارثة.
  */
-function verify(file) {
-  let snap;
+async function verify(file) {
   try {
-    snap = new DatabaseSync(file, { readOnly: true });
-    const check = snap.prepare('PRAGMA integrity_check').get();
-    const okFlag = Object.values(check ?? {})[0];
-    if (okFlag !== 'ok') return { ok: false, error: `فحص السلامة: ${okFlag}` };
+    const bytes = fs.statSync(file).size;
+    if (bytes < 1024) return { ok: false, error: 'الملف أصغر من أن يكون نسخة' };
 
-    const stores = snap.prepare('SELECT COUNT(*) n FROM stores').get().n;
-    const orders = snap.prepare('SELECT COUNT(*) n FROM orders').get().n;
+    // pg_dump يختم الملف بسطر معروف؛ غيابه يعني نسخة مبتورة
+    const tail = fs.readFileSync(file, 'utf8').slice(-4096);
+    if (!/PostgreSQL database dump complete/i.test(tail)) {
+      return { ok: false, error: 'النسخة مبتورة — لم يكتمل pg_dump' };
+    }
+
+    // العدّ من القاعدة الحيّة: النسخة لقطة منها قبل ثوانٍ
+    const stores = (await db.prepare('SELECT COUNT(*)::int n FROM stores').get()).n;
+    const orders = (await db.prepare('SELECT COUNT(*)::int n FROM orders').get()).n;
     return { ok: true, stores, orders };
   } catch (err) {
     return { ok: false, error: err.message };
-  } finally {
-    try { snap?.close(); } catch { /* لا شيء */ }
   }
 }
+
+/** هل pg_dump متاح على هذا المضيف؟ */
+function pgDumpTo(file, url) {
+  return new Promise((resolve) => {
+    const out = fs.createWriteStream(file);
+    const proc = spawn('pg_dump', ['--no-owner', '--no-acl', '--clean', '--if-exists', url],
+      { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    proc.stdout.pipe(out);
+    proc.stderr.on('data', (d) => { stderr += d; });
+    proc.on('error', (err) => resolve({ ok: false, error: err.code === 'ENOENT' ? 'MISSING' : err.message }));
+    proc.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.slice(0, 200) }));
+  });
+}
+
 
 /** يحذف أقدم النسخ ويُبقي العدد المضبوط */
 function prune(dir, keep) {
   const files = fs.readdirSync(dir)
-    .filter((f) => f.startsWith('rvios-') && f.endsWith('.db'))
+    .filter((f) => f.startsWith('rvios-') && f.endsWith('.sql'))
     .sort()
     .reverse();
 
@@ -98,15 +118,26 @@ function copyUploads(srcRoot, dstRoot) {
  * ينشئ نسخة الآن. يعيد وصفها أو يرمي.
  * @param {string} reason سبب النسخ — يظهر في السجل
  */
-export function backupNow(reason = 'scheduled') {
+export async function backupNow(reason = 'scheduled') {
   const dir = ensureDir(config.paths.backups);
-  const file = path.join(dir, `rvios-${stamp()}.db`);
+  const file = path.join(dir, `rvios-${stamp()}.sql`);
   const t0 = performance.now();
 
-  // VACUUM INTO يرفض الكتابة فوق ملف قائم — وهذا ما نريده
-  db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+  const dump = await pgDumpTo(file, config.databaseUrl);
+  if (!dump.ok) {
+    try { fs.unlinkSync(file); } catch { /* لا شيء */ }
+    if (dump.error === 'MISSING') {
+      // الصور تُنسخ على أي حال — وغياب نسخة القاعدة يُعلَن لا يُخفى
+      const only = copyUploads(config.paths.uploads, path.join(dir, 'uploads'));
+      log.warn({ images: only.copied, reason },
+        'pg_dump غير متاح — نُسخت الصور وحدها. نسخ القاعدة على المزوّد.');
+      return { file: null, kb: 0, stores: null, orders: null, images: only.copied, removed: 0,
+        ms: Math.round(performance.now() - t0), reason, dbSkipped: true };
+    }
+    throw new Error(`فشل pg_dump: ${dump.error}`);
+  }
 
-  const check = verify(file);
+  const check = await verify(file);
   if (!check.ok) {
     try { fs.unlinkSync(file); } catch { /* لا شيء */ }
     throw new Error(`النسخة تالفة ولم تُحفظ: ${check.error}`);
@@ -138,8 +169,8 @@ export function startBackups() {
   }
 
   const run = () => {
-    try { backupNow('scheduled'); }
-    catch (err) { log.error({ err: err.message }, 'فشلت النسخة الاحتياطية'); }
+    backupNow('scheduled')
+      .catch((err) => log.error({ err: err.message }, 'فشلت النسخة الاحتياطية'));
   };
 
   run();   // نسخة عند الإقلاع: أسوأ لحظة للاكتشاف هي بعد الكارثة

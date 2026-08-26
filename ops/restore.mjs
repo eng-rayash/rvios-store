@@ -11,7 +11,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { DatabaseSync } from 'node:sqlite';
+import { spawn } from 'node:child_process';
+import { db } from '../src/db.js';
 import { config } from '../src/config.js';
 
 const args = process.argv.slice(2);
@@ -20,27 +21,56 @@ const dir = config.paths.backups;
 function available() {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir)
-    .filter((f) => f.startsWith('rvios-') && f.endsWith('.db'))
+    .filter((f) => f.startsWith('rvios-') && f.endsWith('.sql'))
     .sort().reverse();
 }
 
-/** @param {string} full مسار كامل — لا اسم ملف */
+/**
+ * وصف نسخة pg_dump.
+ * النسخة نصّية، فنعدّ جمل الإدراج بدل فتح قاعدة. العدّ تقريبي
+ * لكنه يكفي للغرض: أن يرى المشغّل حجم ما سيستعيده قبل الدهس.
+ * @param {string} full مسار كامل — لا اسم ملف
+ */
 function describe(full) {
-  let snap;
   try {
-    snap = new DatabaseSync(full, { readOnly: true });
-    const n = (t) => snap.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n;
+    const text = fs.readFileSync(full, 'utf8');
+    if (!/PostgreSQL database dump complete/i.test(text)) {
+      return { error: 'النسخة مبتورة — لم يكتمل pg_dump' };
+    }
+    // pg_dump يُخرج البيانات إما بـ COPY (الافتراضي) أو INSERT
+    const NL = String.fromCharCode(10);
+    const rowsIn = (table) => {
+      const head = `COPY public.${table} `;
+      const at = text.indexOf(head);
+      if (at >= 0) {
+        const from = text.indexOf(NL, at) + 1;
+        const end = text.indexOf(`${NL}\\.`, from);
+        if (end > from) return text.slice(from, end).split(NL).filter(Boolean).length;
+      }
+      return (text.split(`INSERT INTO public.${table} `).length - 1);
+    };
     return {
       kb: Math.round(fs.statSync(full).size / 1024),
-      stores: n('stores'), orders: n('orders'),
-      merchants: n('merchants'), invoices: n('invoices'),
+      stores: rowsIn('stores'), orders: rowsIn('orders'),
+      merchants: rowsIn('merchants'), invoices: rowsIn('invoices'),
     };
   } catch (err) {
     return { error: err.message };
-  } finally {
-    try { snap?.close(); } catch { /* لا شيء */ }
   }
 }
+
+/** يُنفّذ ملف SQL على القاعدة الحيّة عبر psql */
+function psqlRestore(file, url) {
+  return new Promise((resolve) => {
+    const proc = spawn('psql', ['--quiet', '--set', 'ON_ERROR_STOP=1', '-f', file, url],
+      { stdio: ['ignore', 'ignore', 'pipe'] });
+    let err = '';
+    proc.stderr.on('data', (d) => { err += d; });
+    proc.on('error', (e) => resolve({ ok: false, error: e.code === 'ENOENT' ? 'psql غير مثبَّت على هذا المضيف' : e.message }));
+    proc.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: err.slice(0, 400) }));
+  });
+}
+
 
 const files = available();
 
@@ -84,8 +114,13 @@ if (info.error) {
   process.exit(1);
 }
 
-const live = config.paths.db;
-const current = fs.existsSync(live) ? describe(live) : null;
+const live = config.databaseUrl.replace(/:[^:@]*@/, ':****@');   // بلا كلمة مرور في الطباعة
+const n = async (table) => (await db.prepare(`SELECT COUNT(*)::int n FROM ${table}`).get()).n;
+let current = null;
+try {
+  current = { stores: await n('stores'), merchants: await n('merchants'),
+              orders: await n('orders'), invoices: await n('invoices') };
+} catch { current = null; }
 
 console.log(`\n  ═══ استعادة ═══\n`);
 console.log(`  من:   ${path.basename(src)}`);

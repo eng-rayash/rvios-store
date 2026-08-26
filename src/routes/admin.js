@@ -15,40 +15,41 @@ import {
   getSetting, setSetting, YEARLY_MONTHS_FREE, audit,
 } from '../billing.js';
 
-export default function register(r) {
+export default async function register(r) {
 
   // ── الحالة ────────────────────────────────────────────
-  r.get('/api/admin/session', (req, res) => {
+  r.get('/api/admin/session', async (req, res) => {
     try { requireAdmin(req); json(res, { admin: true }); }
     catch { json(res, { admin: false }); }
   });
 
   // ── إحصائيات عامة (§٣.٥) ──────────────────────────────
-  r.get('/api/admin/stats', (req, res) => {
+  r.get('/api/admin/stats', async (req, res) => {
     requireAdmin(req);
-    const one = (sql, ...p) => db.prepare(sql).get(...p);
+    // عدّاد مختصر — async لأن كل استعلام صار غير متزامن
+    const one = async (sql, ...p) => (await db.prepare(sql).get(...p));
 
-    const stores    = one('SELECT COUNT(*) n FROM stores').n;
-    const active    = one(`SELECT COUNT(*) n FROM stores WHERE status='active'`).n;
-    const merchants = one('SELECT COUNT(*) n FROM merchants').n;
+    const stores    = (await one('SELECT COUNT(*) n FROM stores')).n;
+    const active    = (await one(`SELECT COUNT(*) n FROM stores WHERE status='active'`)).n;
+    const merchants = (await one('SELECT COUNT(*) n FROM merchants')).n;
     // معدل الترقية يُقاس بالتجار لا بالمتاجر: تاجر برو بثلاثة متاجر
     // ليس ثلاث ترقيات. القسمة على المتاجر تضخّم النسبة مع التعدد.
-    const paidMerchants = one(`
-      SELECT COUNT(DISTINCT merchant_id) n FROM stores WHERE plan != 'basic'`).n;
-    const paid = one(`SELECT COUNT(*) n FROM stores WHERE plan != 'basic'`).n;
-    const multiStore = one(`
+    const paidMerchants = (await one(`
+      SELECT COUNT(DISTINCT merchant_id) n FROM stores WHERE plan != 'basic'`)).n;
+    const paid = (await one(`SELECT COUNT(*) n FROM stores WHERE plan != 'basic'`)).n;
+    const multiStore = (await one(`
       SELECT COUNT(*) n FROM (SELECT merchant_id FROM stores
-                              GROUP BY merchant_id HAVING COUNT(*) > 1)`).n;
+                              GROUP BY merchant_id HAVING COUNT(*) > 1)`)).n;
 
     // §١٠ — المؤشر الأهم: نسبة التفعيل (رابط + أول منتج)
-    const activated = one(`
+    const activated = (await one(`
       SELECT COUNT(*) n FROM stores s
-      WHERE EXISTS (SELECT 1 FROM products p WHERE p.store_id = s.id)`).n;
+      WHERE EXISTS (SELECT 1 FROM products p WHERE p.store_id = s.id)`)).n;
 
     // متاجر حيّة: أضافت منتجاً خلال ٣٠ يوماً
     const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
-    const lively = one(`
-      SELECT COUNT(DISTINCT store_id) n FROM products WHERE created_at >= ?`, cutoff).n;
+    const lively = (await one(`
+      SELECT COUNT(DISTINCT store_id) n FROM products WHERE created_at >= ?`, cutoff)).n;
 
     json(res, {
       stores, active, merchants,
@@ -61,20 +62,20 @@ export default function register(r) {
       paidMerchants,
       multiStore,
       upgradeRate: merchants ? Math.round((paidMerchants / merchants) * 100) : 0,
-      verified:  one('SELECT COUNT(*) n FROM stores WHERE verified = 1').n,
-      orders:    one('SELECT COUNT(*) n FROM orders').n,
-      confirmed: one(`SELECT COUNT(*) n FROM orders WHERE status IN ('ok','done')`).n,
-      products:  one('SELECT COUNT(*) n FROM products').n,
-      pendingInvoices: one(`SELECT COUNT(*) n FROM invoices WHERE status='under_review'`).n,
-      unpaidInvoices:  one(`SELECT COUNT(*) n FROM invoices WHERE status='unpaid'`).n,
-      revenue: one(`SELECT COALESCE(SUM(amount),0) n FROM invoices WHERE status='paid'`).n,
-      openReports:  one(`SELECT COUNT(*) n FROM reports WHERE status='open'`).n,
-      openRequests: one(`SELECT COUNT(*) n FROM service_requests WHERE status='open'`).n,
+      verified:  await one('SELECT COUNT(*) n FROM stores WHERE verified = 1').n,
+      orders:    await one('SELECT COUNT(*) n FROM orders').n,
+      confirmed: await one(`SELECT COUNT(*) n FROM orders WHERE status IN ('ok','done')`).n,
+      products:  await one('SELECT COUNT(*) n FROM products').n,
+      pendingInvoices: await one(`SELECT COUNT(*) n FROM invoices WHERE status='under_review'`).n,
+      unpaidInvoices:  await one(`SELECT COUNT(*) n FROM invoices WHERE status='unpaid'`).n,
+      revenue: await one(`SELECT COALESCE(SUM(amount),0) n FROM invoices WHERE status='paid'`).n,
+      openReports:  await one(`SELECT COUNT(*) n FROM reports WHERE status='open'`).n,
+      openRequests: await one(`SELECT COUNT(*) n FROM service_requests WHERE status='open'`).n,
     });
   });
 
   // ── إدارة التجار والمتاجر ─────────────────────────────
-  r.get('/api/admin/stores', (req, res) => {
+  r.get('/api/admin/stores', async (req, res) => {
     requireAdmin(req);
     const q = (req.query.get('q') ?? '').trim();
     const like = `%${q}%`;
@@ -94,7 +95,7 @@ export default function register(r) {
   r.patch('/api/admin/stores/:id', async (req, res) => {
     requireAdmin(req);
     const id = toInt(req.params.id);
-    const store = db.prepare('SELECT * FROM stores WHERE id = ?').get(id);
+    const store = await db.prepare('SELECT * FROM stores WHERE id = ?').get(id);
     if (!store) notFound('المتجر غير موجود');
 
     const body = await readBody(req);
@@ -112,23 +113,23 @@ export default function register(r) {
 
     db.prepare(`UPDATE stores SET ${Object.keys(patch).map((k) => `${k}=?`).join(',')} WHERE id = ?`)
       .run(...Object.values(patch), id);
-    json(res, { ok: true, store: db.prepare('SELECT * FROM stores WHERE id = ?').get(id) });
+    json(res, { ok: true, store: await db.prepare('SELECT * FROM stores WHERE id = ?').get(id) });
   });
 
-  r.delete('/api/admin/stores/:id', (req, res) => {
+  r.delete('/api/admin/stores/:id', async (req, res) => {
     requireAdmin(req);
     const id = toInt(req.params.id);
-    const n = db.prepare('DELETE FROM stores WHERE id = ?').run(id).changes;
+    const n = await db.prepare('DELETE FROM stores WHERE id = ?').run(id).changes;
     if (!n) notFound('المتجر غير موجود');
     dropStoreImages(id);   // لا نترك صوراً يتيمة على القرص
     json(res, { ok: true });
   });
 
   // ── البلاغات (§٦.٢) ───────────────────────────────────
-  r.get('/api/admin/reports', (req, res) => {
+  r.get('/api/admin/reports', async (req, res) => {
     requireAdmin(req);
     const status = req.query.get('status') ?? 'open';
-    json(res, db.prepare(`
+    json(res, await db.prepare(`
       SELECT r.*, s.name store_name, s.slug store_slug
       FROM reports r JOIN stores s ON s.id = r.store_id
       WHERE r.status = ? ORDER BY r.created_at DESC LIMIT 200`).all(status));
@@ -138,16 +139,16 @@ export default function register(r) {
     requireAdmin(req);
     const { status } = await readBody(req);
     if (!['open', 'closed'].includes(status)) bad('حالة غير معروفة');
-    const n = db.prepare('UPDATE reports SET status = ? WHERE id = ?').run(status, toInt(req.params.id)).changes;
+    const n = await db.prepare('UPDATE reports SET status = ? WHERE id = ?').run(status, toInt(req.params.id)).changes;
     if (!n) notFound('البلاغ غير موجود');
     json(res, { ok: true });
   });
 
   // ── طلبات الخدمات والتوثيق (§٣.٥) ─────────────────────
-  r.get('/api/admin/requests', (req, res) => {
+  r.get('/api/admin/requests', async (req, res) => {
     requireAdmin(req);
     const status = req.query.get('status') ?? 'open';
-    json(res, db.prepare(`
+    json(res, await db.prepare(`
       SELECT sr.*, s.name store_name, s.slug store_slug
       FROM service_requests sr LEFT JOIN stores s ON s.id = sr.store_id
       WHERE sr.status = ? ORDER BY sr.created_at DESC LIMIT 200`).all(status));
@@ -157,25 +158,25 @@ export default function register(r) {
     requireAdmin(req);
     const body = await readBody(req);
     const id = toInt(req.params.id);
-    const reqRow = db.prepare('SELECT * FROM service_requests WHERE id = ?').get(id);
+    const reqRow = await db.prepare('SELECT * FROM service_requests WHERE id = ?').get(id);
     if (!reqRow) notFound('الطلب غير موجود');
 
     if (!['open', 'done', 'rejected'].includes(body.status)) bad('حالة غير معروفة');
 
     // قبول طلب توثيق يمنح الشارة فعلياً (§٦.١)
     if (body.status === 'done' && reqRow.kind === 'verify' && reqRow.store_id) {
-      db.prepare('UPDATE stores SET verified = 1 WHERE id = ?').run(reqRow.store_id);
+      await db.prepare('UPDATE stores SET verified = 1 WHERE id = ?').run(reqRow.store_id);
     }
-    db.prepare('UPDATE service_requests SET status = ? WHERE id = ?').run(body.status, id);
+    await db.prepare('UPDATE service_requests SET status = ? WHERE id = ?').run(body.status, id);
     json(res, { ok: true });
   });
 
   // ═══ مراجعة المدفوعات (§٥.٦) ══════════════════════════
   //  «ستكون أكثر أقسام لوحة الإدارة استخداماً»
-  r.get('/api/admin/invoices', (req, res) => {
+  r.get('/api/admin/invoices', async (req, res) => {
     requireAdmin(req);
     const status = req.query.get('status') ?? 'under_review';
-    const rows = db.prepare(`
+    const rows = await db.prepare(`
       SELECT i.*, s.name store_name, s.slug store_slug, m.phone owner_phone
       FROM invoices i
       JOIN stores s ON s.id = i.store_id
@@ -200,7 +201,7 @@ export default function register(r) {
   });
 
   // ── إعدادات المنصة: الأسعار وتعليمات التحويل (§١١) ─────
-  r.get('/api/admin/settings', (req, res) => {
+  r.get('/api/admin/settings', async (req, res) => {
     requireAdmin(req);
     json(res, {
       prices: planPrices(),
@@ -231,15 +232,15 @@ export default function register(r) {
   });
 
   // ── سجل التدقيق ───────────────────────────────────────
-  r.get('/api/admin/audit', (req, res) => {
+  r.get('/api/admin/audit', async (req, res) => {
     requireAdmin(req);
-    json(res, db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 200').all());
+    json(res, await db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 200').all());
   });
 
   // ── الباقات (§٣.٥ إدارة الباقات والأسعار) ─────────────
-  r.get('/api/admin/plans', (req, res) => {
+  r.get('/api/admin/plans', async (req, res) => {
     requireAdmin(req);
-    const usage = db.prepare('SELECT plan, COUNT(*) n FROM stores GROUP BY plan').all();
+    const usage = await db.prepare('SELECT plan, COUNT(*) n FROM stores GROUP BY plan').all();
     const byPlan = Object.fromEntries(usage.map((u) => [u.plan, u.n]));
     const prices = planPrices();
     json(res, Object.values(PLANS).map((p) => ({

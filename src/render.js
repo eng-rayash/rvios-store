@@ -20,10 +20,10 @@ const esc = (s) => String(s ?? '')
 const AR = (n) => Number(n ?? 0).toLocaleString('ar-EG');
 
 /** يبني وسوم <head> ومحتوى أولياً لمتجر */
-export function renderStore(html, store, origin) {
+export async function renderStore(html, store, origin) {
   const s = scope(store.id);
-  const products = s.all('products', { live: 1 }, { order: 'sort, id DESC', limit: 12 });
-  const count = s.count('products', { live: 1 });
+  const products = await s.all('products', { live: 1 }, { order: 'sort, id DESC', limit: 12 });
+  const count = await s.count('products', { live: 1 });
 
   const title = `${store.name} — RVIOS Store`;
   const desc = store.tagline || store.about

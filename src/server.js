@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { config, assertConfig } from './config.js';
 import { log, newRequestId, logRequest } from './logger.js';
-import { db, ROOT } from './db.js';
+import { db, ROOT, migrate } from './db.js';
 import { verifyIsolation } from './tenancy.js';
 import { createRouter } from './router.js';
 import { HttpError, json, parseCookies, SECURITY_HEADERS } from './http.js';
@@ -46,8 +46,11 @@ import registerWebhook  from './routes/webhook.js';
 const PORT       = config.port;
 const PUBLIC_DIR = config.paths.public;
 
-// ── فحص العزل قبل قبول أي طلب ────────────────────────────
-verifyIsolation();
+// ── المخطّط ثم فحص العزل، قبل قبول أي طلب ────────────────
+//  الترتيب مقصود: الفحص يقرأ information_schema، فلا معنى له
+//  قبل إنشاء الجداول.
+await migrate();
+await verifyIsolation();
 
 const router = createRouter();
 registerAuth(router);
@@ -221,7 +224,7 @@ const server = http.createServer(async (req, res) => {
 
     // ٣.٥ ملفات الفهرسة — تُولَّد من قاعدة البيانات
     if (pathname === '/sitemap.xml') {
-      const stores = db.prepare(`SELECT slug, created_at FROM stores WHERE status='active' ORDER BY id`).all();
+      const stores = await db.prepare(`SELECT slug, created_at FROM stores WHERE status='active' ORDER BY id`).all();
       sendBody(req, res, renderSitemap(stores, originOf(req)), 'application/xml; charset=utf-8');
       return;
     }
@@ -295,7 +298,7 @@ const server = http.createServer(async (req, res) => {
     // ٥. رابط المتجر: /username  (§٥.٢)
     const seg = pathname.split('/').filter(Boolean);
     if (seg.length === 1 && !RESERVED.has(seg[0])) {
-      const store = db.prepare('SELECT * FROM stores WHERE slug = ?').get(seg[0]);
+      const store = await db.prepare('SELECT * FROM stores WHERE slug = ?').get(seg[0]);
       if (store && store.status === 'active') {
         // HTML مولّد من الخادم: واتساب ومحركات البحث لا تنفّذ JS
         const shell = fs.readFileSync(path.join(PUBLIC_DIR, 'store.html'), 'utf8');
@@ -309,7 +312,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       // §٣.٣ — رابط قديم؟ حوّل ٣٠١ بدل أن تكسر ما نُشر في واتساب
-      const moved = db.prepare(`
+      const moved = await db.prepare(`
         SELECT s.slug FROM store_slug_history h
         JOIN stores s ON s.id = h.store_id
         WHERE h.old_slug = ? AND s.status = 'active'`).get(seg[0]);
@@ -362,12 +365,12 @@ const server = http.createServer(async (req, res) => {
 let shuttingDown = false;
 const startedAt = Date.now();
 
-function health(res) {
+async function health(res) {
   if (shuttingDown) {
     return json(res, { ok: false, status: 'shutting_down' }, 503);
   }
   try {
-    const stores = db.prepare('SELECT COUNT(*) n FROM stores').get().n;
+    const stores = await db.prepare('SELECT COUNT(*) n FROM stores').get().n;
     json(res, {
       ok: true,
       uptime: Math.round((Date.now() - startedAt) / 1000),
@@ -460,8 +463,8 @@ process.on('unhandledRejection', (reason) => {
   log.error({ err: String(reason?.message ?? reason) }, 'وعد مرفوض بلا معالجة');
 });
 
-server.listen(PORT, config.host, () => {
-  const storeCount = db.prepare('SELECT COUNT(*) n FROM stores').get().n;
+server.listen(PORT, config.host, async () => {
+  const storeCount = (await db.prepare('SELECT COUNT(*)::int n FROM stores').get()).n;
 
   if (config.log.json) {
     log.info({ port: PORT, env: config.env, stores: storeCount, version: VERSION }, 'RVIOS Store يعمل');

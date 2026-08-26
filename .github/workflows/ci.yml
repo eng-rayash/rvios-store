@@ -1,6 +1,6 @@
 # ═══════════════════════════════════════════════════════════
 #  التكامل المستمر
-#  لا خطوة تثبيت: المشروع بلا اعتماديات خارجية.
+#  اعتمادية واحدة (عميل postgres)، وقاعدة خدمية للاختبارات.
 # ═══════════════════════════════════════════════════════════
 name: CI
 
@@ -15,10 +15,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    # قاعدة حقيقية لا محاكاة: الاختبارات تلمس المعاملات
+    # وقفل الصفوف، وهذان لا يُحاكيان.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rvios
+          POSTGRES_PASSWORD: rvios
+          POSTGRES_DB: rvios_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rvios -d rvios_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+
     env:
       # أسرار وهمية: الاختبارات تحتاج قيماً موجودة لا صحيحة.
       # المفاتيح الحقيقية لا تدخل CI أبداً.
       NODE_ENV: development
+      DATABASE_URL: postgresql://rvios:rvios@localhost:5432/rvios_test?sslmode=disable
       OTP_PROVIDER: console
       OTP_PEPPER: ci-pepper-not-a-real-secret
       VISIT_SALT: ci-salt-not-a-real-secret
@@ -32,8 +47,20 @@ jobs:
         with:
           node-version: '24'
 
+      - name: تثبيت الاعتماديات
+        run: npm ci --no-audit --no-fund
+
+      - name: شجرة الاعتماديات تبقى ضحلة
+        run: |
+          npm ls --all
+          # حزمة واحدة بلا متعدّيات — أي نموّ هنا قرار لا مفاجأة
+          test "$(npm ls --all --parseable | wc -l)" -le 2
+
+      - name: تطبيق المخطّط
+        run: npm run migrate
+
       - name: التحقق من العزل بين المتاجر
-        run: node --no-warnings -e "import('./src/tenancy.js').then(m => m.verifyIsolation())"
+        run: node --no-warnings -e "import('./src/tenancy.js').then(m => m.verifyIsolation()).then(() => import('./src/pg.js')).then(m => m.db.close())"
 
       - name: تدقيق الجاهزية
         run: npm run readiness
@@ -60,6 +87,7 @@ jobs:
           node --no-warnings test/pages.mjs
           node --no-warnings test/webhook.mjs
           node --no-warnings test/infra.mjs
+          node --no-warnings test/pagination.mjs
 
       - name: الإيقاف الرشيد يعمل
         run: |

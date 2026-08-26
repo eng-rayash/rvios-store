@@ -13,8 +13,8 @@ import { HttpError } from './http.js';
 import { notifyMerchant } from './notify.js';
 
 // ── إعدادات المنصة ───────────────────────────────────────
-export function getSetting(key, fallback = null) {
-  const row = db.prepare('SELECT value FROM platform_settings WHERE key = ?').get(key);
+export async function getSetting(key, fallback = null) {
+  const row = await db.prepare('SELECT value FROM platform_settings WHERE key = ?').get(key);
   if (!row) return fallback;
   try { return JSON.parse(row.value); } catch { return row.value; }
 }
@@ -65,12 +65,12 @@ export function paymentMethods() {
 }
 
 // ── الاشتراك ─────────────────────────────────────────────
-export function ensureSubscription(storeId, plan = 'basic') {
+export async function ensureSubscription(storeId, plan = 'basic') {
   const s = scope(storeId);
-  let sub = s.get('subscriptions', {});
+  let sub = await s.get('subscriptions', {});
   if (!sub) {
-    s.insert('subscriptions', { plan, status: 'active', created_at: now() });
-    sub = s.get('subscriptions', {});
+    await s.insert('subscriptions', { plan, status: 'active', created_at: now() });
+    sub = await s.get('subscriptions', {});
   }
   return sub;
 }
@@ -81,15 +81,15 @@ const GRACE_DAYS = 7;
  * حالة الاشتراك المؤثرة على الحدود.
  * الباقة المجانية لا تنتهي أبداً — لا شيء يُحصَّل عليها.
  */
-export function effectivePlan(store) {
-  const sub = scope(store.id).get('subscriptions', {});
+export async function effectivePlan(store) {
+  const sub = await scope(store.id).get('subscriptions', {});
   if (!sub || sub.plan === 'basic') return 'basic';
   // منتهٍ ⇒ يعود لحدود المجانية، لكن **بلا حذف أي بيانات** (§٥.٥)
   return sub.status === 'expired' ? 'basic' : sub.plan;
 }
 
-export function subscriptionOf(store) {
-  const sub = scope(store.id).get('subscriptions', {});
+export async function subscriptionOf(store) {
+  const sub = await scope(store.id).get('subscriptions', {});
   if (!sub) return { plan: 'basic', status: 'active', currentPeriodEnd: null, daysLeft: null };
 
   const end = sub.current_period_end ? new Date(sub.current_period_end) : null;
@@ -106,11 +106,11 @@ export function subscriptionOf(store) {
 }
 
 // ── الفواتير ─────────────────────────────────────────────
-function nextRef() {
+async function nextRef() {
   for (let i = 0; i < 20; i++) {
     const n = crypto.randomInt(1000, 9999);
     const ref = `RV-INV-${n}`;
-    if (!db.prepare('SELECT 1 FROM invoices WHERE ref = ?').get(ref)) return ref;
+    if (!await db.prepare('SELECT 1 FROM invoices WHERE ref = ?').get(ref)) return ref;
   }
   return `RV-INV-${Date.now().toString().slice(-6)}`;
 }
@@ -122,7 +122,7 @@ const DUE_DAYS = 7;
  * `ref` هو المفتاح التشغيلي: يكتبه التاجر في ملاحظات التحويل،
  * وبدونه تصبح مطابقة الحوالات بالمبالغ مستحيلة عملياً (§٥.٢).
  */
-export function createInvoice(storeId, { kind, plan = null, months = 1 }) {
+export async function createInvoice(storeId, { kind, plan = null, months = 1 }) {
   const s = scope(storeId);
 
   const KINDS = ['subscription', 'store_build', 'domain', 'extra_store'];
@@ -140,7 +140,7 @@ export function createInvoice(storeId, { kind, plan = null, months = 1 }) {
   } else {
     // المتجر الإضافي حكر على برو — الباقة تفتح الإمكانية ولا تهدي متجراً
     if (kind === 'extra_store') {
-      const store = db.prepare('SELECT * FROM stores WHERE id = ?').get(storeId);
+      const store = await db.prepare('SELECT * FROM stores WHERE id = ?').get(storeId);
       if (!PLANS[store?.plan]?.canBuyExtraStores) {
         throw new HttpError(409, 'المتاجر الإضافية متاحة في باقة برو — رقِّ باقتك أولاً', 'PRO_REQUIRED');
       }
@@ -165,7 +165,7 @@ export function createInvoice(storeId, { kind, plan = null, months = 1 }) {
    * الحالة ٢ كانت تعيد الفاتورة القديمة بصمت: يطلب التاجر برو
    * فيرى فاتورة بلس بمبلغ آخر ورسالة «أُنشئت فاتورتك».
    */
-  const open = s.raw(
+  const open = await s.raw(
     `SELECT * FROM invoices WHERE store_id = ? AND kind = ? AND status IN ('unpaid','under_review')
      ORDER BY created_at DESC LIMIT 1`, [storeId, kind])[0];
 
@@ -179,10 +179,10 @@ export function createInvoice(storeId, { kind, plan = null, months = 1 }) {
         'INVOICE_PENDING');
     }
     // غير مدفوعة ومختلفة — نستبدلها فلا تبقى فاتورة معلّقة لا يريدها
-    s.update('invoices', open.id, { status: 'void', void_reason: 'استُبدلت بطلب أحدث' });
+    await s.update('invoices', open.id, { status: 'void', void_reason: 'استُبدلت بطلب أحدث' });
   }
 
-  const id = s.insert('invoices', {
+  const id = await s.insert('invoices', {
     ref: nextRef(),
     kind, plan, months,
     amount,
@@ -191,7 +191,7 @@ export function createInvoice(storeId, { kind, plan = null, months = 1 }) {
     due_at: new Date(Date.now() + DUE_DAYS * 86400000).toISOString(),
     created_at: now(),
   });
-  return s.get('invoices', { id });
+  return await s.get('invoices', { id });
 }
 
 /**
@@ -201,44 +201,44 @@ export function createInvoice(storeId, { kind, plan = null, months = 1 }) {
  * يوماً كاملاً تجربة سيئة. مخاطرة إيصال مزوّر واحد أرخص بكثير
  * من إحباط عشرة تجار دافعين — والمراجعة اللاحقة تُلغي التفعيل.
  */
-export function submitProof(storeId, invoiceId, { method, proofKey }) {
+export async function submitProof(storeId, invoiceId, { method, proofKey }) {
   const s = scope(storeId);
-  const inv = s.get('invoices', { id: invoiceId });
+  const inv = await s.get('invoices', { id: invoiceId });
   if (!inv) throw new HttpError(404, 'الفاتورة غير موجودة');
   if (inv.status === 'paid') throw new HttpError(409, 'هذه الفاتورة مدفوعة بالفعل');
   if (inv.status === 'void') throw new HttpError(409, 'هذه الفاتورة ملغاة');
   if (!proofKey) throw new HttpError(400, 'أرفق صورة الإيصال');
 
-  s.update('invoices', invoiceId, { status: 'under_review', method: method ?? '', proof_key: proofKey });
+  await s.update('invoices', invoiceId, { status: 'under_review', method: method ?? '', proof_key: proofKey });
 
   // التفعيل فوري قبل المراجعة (§٥.٣) — للاشتراك وللخانة معاً
   if (inv.kind === 'subscription') activatePlan(storeId, inv.plan, inv.months);
   if (inv.kind === 'extra_store')  grantStoreSlot(storeId);
 
-  return s.get('invoices', { id: invoiceId });
+  return await s.get('invoices', { id: invoiceId });
 }
 
 /** يفعّل الباقة ويمدّ الفترة */
-export function activatePlan(storeId, plan, months = 1) {
+export async function activatePlan(storeId, plan, months = 1) {
   const s = scope(storeId);
   ensureSubscription(storeId);
-  const sub = s.get('subscriptions', {});
+  const sub = await s.get('subscriptions', {});
 
   // التمديد من نهاية الفترة الحالية إن كانت سارية، وإلا من اليوم
   const base = sub.current_period_end && new Date(sub.current_period_end) > new Date()
     ? new Date(sub.current_period_end) : new Date();
   base.setMonth(base.getMonth() + Number(months || 1));
 
-  s.update('subscriptions', sub.id, {
+  await s.update('subscriptions', sub.id, {
     plan, status: 'active', current_period_end: base.toISOString(), notified_at: null,
   });
-  db.prepare('UPDATE stores SET plan = ? WHERE id = ?').run(plan, storeId);
-  return s.get('subscriptions', {});
+  await db.prepare('UPDATE stores SET plan = ? WHERE id = ?').run(plan, storeId);
+  return await s.get('subscriptions', {});
 }
 
 /** الإدارة تؤكد الدفع */
-export function markPaid(invoiceId, actor) {
-  const inv = db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
+export async function markPaid(invoiceId, actor) {
+  const inv = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
   if (!inv) throw new HttpError(404, 'الفاتورة غير موجودة');
 
   db.prepare('UPDATE invoices SET status = ?, paid_at = ?, reviewed_by = ? WHERE id = ?')
@@ -250,12 +250,12 @@ export function markPaid(invoiceId, actor) {
     if (inv.kind === 'extra_store')  grantStoreSlot(inv.store_id);
   }
   audit(actor, 'invoice.paid', inv.ref, `${inv.amount} ${inv.currency}`);
-  return db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
+  return await db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
 }
 
 /** الإدارة ترفض الإيصال → إلغاء التفعيل الذي مُنح مسبقاً */
-export function voidInvoice(invoiceId, actor, reason) {
-  const inv = db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
+export async function voidInvoice(invoiceId, actor, reason) {
+  const inv = await db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
   if (!inv) throw new HttpError(404, 'الفاتورة غير موجودة');
 
   db.prepare('UPDATE invoices SET status = ?, reviewed_by = ?, void_reason = ? WHERE id = ?')
@@ -264,16 +264,16 @@ export function voidInvoice(invoiceId, actor, reason) {
   if (inv.status === 'under_review') {
     if (inv.kind === 'subscription') {
       const s = scope(inv.store_id);
-      const sub = s.get('subscriptions', {});
+      const sub = await s.get('subscriptions', {});
       if (sub) {
-        s.update('subscriptions', sub.id, { plan: 'basic', status: 'expired' });
-        db.prepare('UPDATE stores SET plan = ? WHERE id = ?').run('basic', inv.store_id);
+        await s.update('subscriptions', sub.id, { plan: 'basic', status: 'expired' });
+        await db.prepare('UPDATE stores SET plan = ? WHERE id = ?').run('basic', inv.store_id);
       }
     }
     if (inv.kind === 'extra_store') revokeStoreSlot(inv.store_id);
   }
   audit(actor, 'invoice.void', inv.ref, reason ?? '');
-  return db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
+  return await db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
 }
 
 // ── انتهاء الاشتراك — التدرّج الناعم (§٥.٥) ───────────────
@@ -363,27 +363,27 @@ export async function runReminderSweep() {
   return sent;
 }
 
-export function runSubscriptionSweep() {
+export async function runSubscriptionSweep() {
   const nowIso = now();
   const graceCutoff = new Date(Date.now() - GRACE_DAYS * 86400000).toISOString();
   const changed = { toGrace: 0, toExpired: 0 };
 
-  const due = db.prepare(`
+  const due = await db.prepare(`
     SELECT * FROM subscriptions
     WHERE plan != 'basic' AND status = 'active'
       AND current_period_end IS NOT NULL AND current_period_end < ?`).all(nowIso);
   for (const sub of due) {
-    db.prepare('UPDATE subscriptions SET status = ? WHERE id = ?').run('grace', sub.id);
+    await db.prepare('UPDATE subscriptions SET status = ? WHERE id = ?').run('grace', sub.id);
     changed.toGrace++;
     notifyStage(sub.store_id, 'grace', sub.id);
   }
 
-  const expired = db.prepare(`
+  const expired = await db.prepare(`
     SELECT * FROM subscriptions
     WHERE status = 'grace' AND current_period_end < ?`).all(graceCutoff);
   for (const sub of expired) {
-    db.prepare('UPDATE subscriptions SET status = ? WHERE id = ?').run('expired', sub.id);
-    db.prepare('UPDATE stores SET plan = ? WHERE id = ?').run('basic', sub.store_id);
+    await db.prepare('UPDATE subscriptions SET status = ? WHERE id = ?').run('expired', sub.id);
+    await db.prepare('UPDATE stores SET plan = ? WHERE id = ?').run('basic', sub.store_id);
     changed.toExpired++;
     notifyStage(sub.store_id, 'expired', sub.id);
   }
@@ -396,8 +396,8 @@ export function runSubscriptionSweep() {
  * تغيير الحالة في القاعدة هو الحقيقة؛ الإشعار تحسين. لو ربطنا
  * أحدهما بالآخر لتوقّف كنس بقية الاشتراكات عند أول عطل شبكة.
  */
-function notifyStage(storeId, stage, subId) {
-  const store = db.prepare('SELECT * FROM stores WHERE id = ?').get(storeId);
+async function notifyStage(storeId, stage, subId) {
+  const store = await db.prepare('SELECT * FROM stores WHERE id = ?').get(storeId);
   if (!store) return;
 
   notifyMerchant(store, reminderText(store, stage, 0))
@@ -413,9 +413,9 @@ function notifyStage(storeId, stage, subId) {
  * المنتجات المخفية بسبب انتهاء الاشتراك.
  * تُحسب ولا تُحذف: أقدم المنتجات تبقى ظاهرة، والزائد يُخفى.
  */
-export function hiddenByPlanCount(store, limit) {
+export async function hiddenByPlanCount(store, limit) {
   if (limit === Infinity) return 0;
-  const total = scope(store.id).count('products', {});
+  const total = await scope(store.id).count('products', {});
   return Math.max(0, total - limit);
 }
 
@@ -423,8 +423,8 @@ export function hiddenByPlanCount(store, limit) {
 export const MAX_STORE_SLOTS = 5;
 
 /** التاجر المالك لمتجر */
-function merchantOfStore(storeId) {
-  return db.prepare(`SELECT m.* FROM merchants m JOIN stores s ON s.merchant_id = m.id
+async function merchantOfStore(storeId) {
+  return await db.prepare(`SELECT m.* FROM merchants m JOIN stores s ON s.merchant_id = m.id
                      WHERE s.id = ?`).get(storeId);
 }
 
@@ -432,11 +432,11 @@ function merchantOfStore(storeId) {
  * يمنح خانة متجر إضافي بعد دفع فاتورة `extra_store`.
  * الخانة مملوكة للحساب لا للمتجر الذي صدرت منه الفاتورة.
  */
-export function grantStoreSlot(storeId) {
+export async function grantStoreSlot(storeId) {
   const m = merchantOfStore(storeId);
   if (!m) return null;
   const next = Math.min(MAX_STORE_SLOTS, (m.store_slots ?? 1) + 1);
-  db.prepare('UPDATE merchants SET store_slots = ? WHERE id = ?').run(next, m.id);
+  await db.prepare('UPDATE merchants SET store_slots = ? WHERE id = ?').run(next, m.id);
   return next;
 }
 
@@ -445,18 +445,18 @@ export function grantStoreSlot(storeId) {
  * **لا ينزل تحت عدد المتاجر القائمة**: الرفض يمنع متجراً جديداً
  * ولا يحذف قائماً — بيانات التاجر لا تُمس بقرار فوترة.
  */
-export function revokeStoreSlot(storeId) {
+export async function revokeStoreSlot(storeId) {
   const m = merchantOfStore(storeId);
   if (!m) return null;
-  const owned = db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(m.id).n;
+  const owned = await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(m.id).n;
   const next = Math.max(1, owned, (m.store_slots ?? 1) - 1);
-  db.prepare('UPDATE merchants SET store_slots = ? WHERE id = ?').run(next, m.id);
+  await db.prepare('UPDATE merchants SET store_slots = ? WHERE id = ?').run(next, m.id);
   return next;
 }
 
 /** حالة الخانات لعرضها للتاجر */
-export function slotsOf(merchant) {
-  const owned = db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id).n;
+export async function slotsOf(merchant) {
+  const owned = await db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id).n;
   const slots = merchant.store_slots ?? 1;
   return { owned, slots, free: Math.max(0, slots - owned), max: MAX_STORE_SLOTS };
 }

@@ -41,7 +41,7 @@ export default function register(r) {
   // ── ١. تحدّي التفعيل ──────────────────────────────────
   //  Meta ترسل GET مرة واحدة عند حفظ العنوان، وتتوقّع أن
   //  نعيد hub.challenge نصّاً خاماً — أي تغليف JSON يُفشل الحفظ.
-  r.get('/api/webhooks/whatsapp', (req, res) => {
+  r.get('/api/webhooks/whatsapp', async (req, res) => {
     const mode = req.query.get('hub.mode');
     const token = req.query.get('hub.verify_token');
     const challenge = req.query.get('hub.challenge') ?? '';

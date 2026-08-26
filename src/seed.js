@@ -5,25 +5,29 @@
 //  التشغيل:  npm run seed        (يضيف إن كانت القاعدة فارغة)
 //            npm run reset       (يمسح كل شيء ويعيد البناء)
 // ═══════════════════════════════════════════════════════════
-import { db, now } from './db.js';
+import { db, now, migrate } from './db.js';
 import { scope } from './tenancy.js';
 import { makeRef } from './orders.js';
 
 const RESET = process.argv.includes('--reset');
 
+// المخطّط أولاً: البذر على قاعدة فارغة تماماً أمر شائع
+await migrate();
+
 if (RESET) {
   // الترتيب يحترم المفاتيح الأجنبية: التوابع أولاً ثم الأصول
-  for (const t of ['order_items', 'orders', 'product_images', 'products', 'categories',
-                   'visits', 'visit_marks', 'reports', 'service_requests',
-                   'invoices', 'subscriptions', 'store_slug_history',
-                   'stores', 'sessions', 'otps', 'rate_limits', 'merchants',
-                   'platform_settings', 'audit_log']) {
-    db.exec(`DELETE FROM ${t}`);
-  }
+  // TRUNCATE ... RESTART IDENTITY يعيد ضبط عدّادات المعرّفات أيضاً،
+  // فتبدأ البيانات الأولية من ١ في كل مرة كما كانت مع SQLite.
+  await db.exec(`TRUNCATE order_items, orders, product_images, products, categories,
+                        visits, visit_marks, reports, service_requests,
+                        invoices, subscriptions, store_slug_history,
+                        stores, sessions, otps, rate_limits, merchants,
+                        platform_settings, audit_log
+                 RESTART IDENTITY CASCADE`);
   console.log('  ✔ مُسحت البيانات السابقة');
 }
 
-if (db.prepare('SELECT COUNT(*) n FROM stores').get().n > 0) {
+if ((await db.prepare('SELECT COUNT(*)::int n FROM stores').get()).n > 0) {
   console.log('  • القاعدة تحتوي متاجر بالفعل — استخدم npm run reset لإعادة البناء');
   process.exit(0);
 }
@@ -31,21 +35,23 @@ if (db.prepare('SELECT COUNT(*) n FROM stores').get().n > 0) {
 const ago = (days, hours = 0) =>
   new Date(Date.now() - days * 86400000 - hours * 3600000).toISOString();
 
-function merchant(phone, name) {
-  return Number(db.prepare('INSERT INTO merchants (phone, name, created_at) VALUES (?,?,?)')
-    .run(phone, name, ago(60)).lastInsertRowid);
+async function merchant(phone, name) {
+  const res = await db.prepare('INSERT INTO merchants (phone, name, created_at) VALUES (?,?,?)')
+    .run(phone, name, ago(60));
+  return Number(res.lastInsertRowid);
 }
 
-function store(merchantId, data) {
+async function store(merchantId, data) {
   const cols = Object.keys(data);
-  return Number(db.prepare(
+  const res = await db.prepare(
     `INSERT INTO stores (merchant_id, ${cols.join(',')}, created_at) VALUES (?, ${cols.map(() => '?').join(',')}, ?)`)
-    .run(merchantId, ...cols.map((c) => data[c]), data.created_at ?? ago(45)).lastInsertRowid);
+    .run(merchantId, ...cols.map((c) => data[c]), data.created_at ?? ago(45));
+  return Number(res.lastInsertRowid);
 }
 
 // ═══ ١. متجر ذو يزن للعطور ═════════════════════════════════
-const m1 = merchant('777000000', 'ذو يزن');
-const s1 = store(m1, {
+const m1 = await merchant('777000000', 'ذو يزن');
+const s1 = await store(m1, {
   slug: 'yazan',
   name: 'متجر ذو يزن للعطور',
   sector: 'perfumes',
@@ -66,10 +72,10 @@ const s1 = store(m1, {
 
 const S1 = scope(s1);
 const cat = (name, sort) => S1.insert('categories', { name, sort });
-const cMen   = cat('عطور رجالية', 1);
-const cWomen = cat('عطور نسائية', 2);
-const cOud   = cat('بخور وعود', 3);
-const cGift  = cat('أطقم وهدايا', 4);
+const cMen   = await cat('عطور رجالية', 1);
+const cWomen = await cat('عطور نسائية', 2);
+const cOud   = await cat('بخور وعود', 3);
+const cGift  = await cat('أطقم وهدايا', 4);
 
 const PRODUCTS = [
   { c: cMen,   name: 'سوفاج او فورت',        img: 'p1', price: 38500, old: 44000, qty: 12, variant: '١٠٠ مل', summary: 'عطري منعش',
@@ -92,7 +98,9 @@ const PRODUCTS = [
     desc: 'ثلاث عطرات مختارة في علبة هدايا مبطّنة مع بطاقة إهداء، مناسب للمناسبات والأعياد.' },
 ];
 
-const productIds = PRODUCTS.map((p, i) => S1.insert('products', {
+const productIds = [];
+for (const [i, p] of PRODUCTS.entries()) {
+  productIds.push(await S1.insert('products', {
   category_id: p.c,
   name: p.name,
   summary: p.summary,
@@ -104,15 +112,18 @@ const productIds = PRODUCTS.map((p, i) => S1.insert('products', {
   image: `/assets/img/${p.img}.jpg`,
   live: 1,
   sort: i + 1,
-  created_at: ago(40 - i),
-}));
+    created_at: ago(40 - i),
+  }));
+}
 
 // ── معرض صور لأول منتجين (باقة بلس تسمح بأربع) ──────────
-[[0, ['p2', 'p5']], [6, ['p6', 'p3']]].forEach(([idx, extras]) => {
-  extras.forEach((img, i) => S1.insert('product_images', {
-    product_id: productIds[idx], url: `/assets/img/${img}.jpg`, sort: i + 1,
-  }));
-});
+for (const [idx, extras] of [[0, ['p2', 'p5']], [6, ['p6', 'p3']]]) {
+  for (const [i, img] of extras.entries()) {
+    await S1.insert('product_images', {
+      product_id: productIds[idx], url: `/assets/img/${img}.jpg`, sort: i + 1,
+    });
+  }
+}
 
 // ── طلبات واقعية عبر الحالات الأربع ──────────────────────
 const ORDERS = [
@@ -131,23 +142,23 @@ for (const o of ORDERS) {
     return { product_id: productIds[idx], name: p.name, variant: p.variant, price: p.price, qty };
   });
   const total = items.reduce((a, l) => a + l.price * l.qty, 0);
-  const orderId = S1.insert('orders', {
+  const orderId = await S1.insert('orders', {
     ref: makeRef(), cust_name: o.name, cust_phone: o.phone,
     note: '', total, status: o.status, created_at: o.when,
   });
-  for (const it of items) S1.insert('order_items', { order_id: orderId, ...it });
+  for (const it of items) await S1.insert('order_items', { order_id: orderId, ...it });
 }
 
 // ── زيارات آخر ٧ أيام ────────────────────────────────────
 const VISITS = [41, 58, 47, 72, 66, 89, 103];
-VISITS.forEach((count, i) => {
+for (const [i, count] of VISITS.entries()) {
   const day = new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10);
-  db.prepare('INSERT INTO visits (store_id, day, count) VALUES (?,?,?)').run(s1, day, count);
-});
+  await db.prepare('INSERT INTO visits (store_id, day, count) VALUES (?,?,?)').run(s1, day, count);
+}
 
 // ═══ ٢. متجر ملابس (باقة مجانية، غير موثّق) ═══════════════
-const m2 = merchant('733445566', 'نورا');
-const s2 = store(m2, {
+const m2 = await merchant('733445566', 'نورا');
+const s2 = await store(m2, {
   slug: 'nura-boutique',
   name: 'نورا بوتيك',
   sector: 'fashion',
@@ -161,20 +172,22 @@ const s2 = store(m2, {
   plan: 'basic', verified: 0,
 });
 const S2 = scope(s2);
-const n1 = S2.insert('categories', { name: 'فساتين', sort: 1 });
-const n2 = S2.insert('categories', { name: 'عبايات', sort: 2 });
-[
+const n1 = await S2.insert('categories', { name: 'فساتين', sort: 1 });
+const n2 = await S2.insert('categories', { name: 'عبايات', sort: 2 });
+for (const [i, [name, c, price, qty]] of [
   ['فستان سهرة مطرّز', n1, 45000, 5],
   ['فستان صيفي قطن',   n1, 18000, 12],
   ['عباية كلاسيك',     n2, 27000, 8],
-].forEach(([name, c, price, qty], i) => S2.insert('products', {
-  category_id: c, name, price, qty, summary: '', description: '',
-  variant: '', image: '', live: 1, sort: i + 1, created_at: ago(20 - i),
-}));
+].entries()) {
+  await S2.insert('products', {
+    category_id: c, name, price, qty, summary: '', description: '',
+    variant: '', image: '', live: 1, sort: i + 1, created_at: ago(20 - i),
+  });
+}
 
 // ═══ ٣. متجر برو — لعرض الطبقة الفاخرة وسكِن منتصف الليل ══
-const m4 = merchant('712334455', 'أطلس');
-const s4 = store(m4, {
+const m4 = await merchant('712334455', 'أطلس');
+const s4 = await store(m4, {
   slug: 'atlas',
   name: 'أطلس للإلكترونيات',
   sector: 'electronics',
@@ -193,26 +206,28 @@ const s4 = store(m4, {
   delivery_note: 'توصيل داخل صنعاء خلال ٢٤ ساعة',
 });
 const S4 = scope(s4);
-const a1 = S4.insert('categories', { name: 'هواتف', sort: 1 });
-const a2 = S4.insert('categories', { name: 'سماعات', sort: 2 });
-const a3 = S4.insert('categories', { name: 'إكسسوارات', sort: 3 });
-[
+const a1 = await S4.insert('categories', { name: 'هواتف', sort: 1 });
+const a2 = await S4.insert('categories', { name: 'سماعات', sort: 2 });
+const a3 = await S4.insert('categories', { name: 'إكسسوارات', sort: 3 });
+for (const [i, [name, c, price, old, qty, variant, desc]] of [
   ['هاتف ذكي — ١٢٨ جيجا', a1, 285000, 320000, 6,  'شاشة ٦.٧ بوصة', 'شاشة أموليد ١٢٠ هرتز، بطارية ٥٠٠٠ ملي أمبير، وشحن سريع. مختوم بضمان الوكيل سنة كاملة.'],
   ['هاتف اقتصادي — ٦٤ جيجا', a1, 98000, 0, 14, 'بطارية ٦٠٠٠', 'بطارية ضخمة تكفي يومين استخداماً عادياً، مناسب للعمل الميداني.'],
   ['سماعة لاسلكية', a2, 42000, 52000, 9, 'عزل ضوضاء', 'عزل نشط للضوضاء مع ٣٠ ساعة تشغيل وعلبة شحن مغناطيسية.'],
   ['سماعة رأس استوديو', a2, 76000, 0, 3, 'سلكية', 'استجابة ترددية متوازنة للمونتاج والتسجيل، وسادات جلدية قابلة للاستبدال.'],
   ['شاحن سريع ٦٥ واط', a3, 15500, 19000, 22, 'ثلاثة منافذ', 'يشحن الحاسب والهاتف معاً، حماية من الحرارة الزائدة.'],
   ['حقيبة حاسب مقاومة للماء', a3, 21000, 0, 0, '١٥ بوصة', 'بطانة إسفنجية مزدوجة وجيب داخلي مبطّن للشاحن.'],
-].forEach(([name, c, price, old, qty, variant, desc], i) => S4.insert('products', {
-  category_id: c, name, price, old_price: old || null, qty, variant,
-  summary: variant, description: desc,
-  image: `/assets/img/p${(i % 9) + 1}.jpg`,
-  live: 1, sort: i + 1, created_at: ago(30 - i),
-}));
+].entries()) {
+  await S4.insert('products', {
+    category_id: c, name, price, old_price: old || null, qty, variant,
+    summary: variant, description: desc,
+    image: `/assets/img/p${(i % 9) + 1}.jpg`,
+    live: 1, sort: i + 1, created_at: ago(30 - i),
+  });
+}
 
 // ═══ ٤. متجر موقوف + بلاغ (للوحة الإدارة) ════════════════
-const m3 = merchant('770998877', 'تاجر تجريبي');
-const s3 = store(m3, {
+const m3 = await merchant('770998877', 'تاجر تجريبي');
+const s3 = await store(m3, {
   slug: 'under-review',
   name: 'متجر تحت المراجعة',
   sector: 'other',
@@ -220,14 +235,14 @@ const s3 = store(m3, {
   whatsapp: '770998877',
   plan: 'basic', verified: 0, status: 'suspended',
 });
-scope(s3).insert('reports', {
+await scope(s3).insert('reports', {
   reason: 'منتجات مضللة',
   detail: 'الصور المعروضة لا تطابق ما يُسلَّم فعلياً.',
   status: 'open', created_at: ago(1),
 });
 
 // ── طلبات خدمات مفتوحة ───────────────────────────────────
-S2.insert('service_requests', {
+await S2.insert('service_requests', {
   kind: 'verify', contact: '733445566',
   detail: 'أرغب بتوثيق المتجر — لدي سجل تجاري.',
   status: 'open', created_at: ago(2),
@@ -251,3 +266,4 @@ console.log(`
       ٧١٢٣٣٤٤٥٥  →  أطلس
     رمز التحقق يظهر في الصفحة وفي سجل الخادم (وضع التطوير).
 `);
+await db.close();

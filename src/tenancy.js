@@ -50,7 +50,7 @@ function buildWhere(storeId, where) {
  * البوابة الوحيدة لبيانات أي متجر.
  * @param {number} storeId
  */
-export function scope(storeId) {
+export function scope(storeId, conn = db) {
   const id = Number(storeId);
   if (!Number.isInteger(id) || id <= 0) {
     throw new TenancyError('مُعرّف المتجر غير صالح — رُفض الاستعلام قبل تنفيذه.');
@@ -59,38 +59,46 @@ export function scope(storeId) {
   const api = {
     storeId: id,
 
-    all(table, where, { order = '', limit = 0, offset = 0 } = {}) {
+    async all(table, where, { order = '', limit = 0, offset = 0 } = {}) {
       assertTable(table);
       const w = buildWhere(id, where);
       let sql = `SELECT * FROM ${table} WHERE ${w.sql}`;
       if (order) sql += ` ORDER BY ${order}`;
       if (limit) sql += ` LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
-      return db.prepare(sql).all(...w.values);
+      return conn.prepare(sql).all(...w.values);
     },
 
-    get(table, where) {
+    /**
+     * `forUpdate` يقفل الصف حتى نهاية المعاملة.
+     * SQLite كان يسلسل كل الكتابات بـ BEGIN IMMEDIATE؛ Postgres
+     * يسمح بالتزامن، فبدون القفل يقرأ طلبان الكمية نفسها ويبيعان
+     * القطعة ذاتها مرتين.
+     */
+    async get(table, where, { forUpdate = false } = {}) {
       assertTable(table);
       const w = buildWhere(id, where);
-      return db.prepare(`SELECT * FROM ${table} WHERE ${w.sql} LIMIT 1`).get(...w.values) ?? null;
+      const lock = forUpdate ? ' FOR UPDATE' : '';
+      return await conn.prepare(`SELECT * FROM ${table} WHERE ${w.sql} LIMIT 1${lock}`).get(...w.values);
     },
 
-    count(table, where) {
+    async count(table, where) {
       assertTable(table);
       const w = buildWhere(id, where);
-      return db.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${w.sql}`).get(...w.values).n;
+      const row = await conn.prepare(`SELECT COUNT(*)::int n FROM ${table} WHERE ${w.sql}`).get(...w.values);
+      return row.n;
     },
 
-    insert(table, data) {
+    async insert(table, data) {
       assertTable(table);
       // store_id يُفرض من النطاق، ويتجاهل أي قيمة قادمة من المُدخل
       const row = { ...data, store_id: id };
       const cols = Object.keys(row);
       const sql = `INSERT INTO ${table} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`;
-      const res = db.prepare(sql).run(...cols.map((c) => row[c]));
+      const res = await conn.prepare(sql).run(...cols.map((c) => row[c]));
       return Number(res.lastInsertRowid);
     },
 
-    update(table, rowId, data) {
+    async update(table, rowId, data) {
       assertTable(table);
       const patch = { ...data };
       delete patch.store_id;            // لا يمكن نقل صف من متجر لآخر
@@ -98,24 +106,25 @@ export function scope(storeId) {
       const cols = Object.keys(patch);
       if (!cols.length) return 0;
       const sql = `UPDATE ${table} SET ${cols.map((c) => `${c} = ?`).join(',')} WHERE id = ? AND store_id = ?`;
-      const res = db.prepare(sql).run(...cols.map((c) => patch[c]), rowId, id);
+      const res = await conn.prepare(sql).run(...cols.map((c) => patch[c]), rowId, id);
       return res.changes;
     },
 
-    remove(table, rowId) {
+    async remove(table, rowId) {
       assertTable(table);
-      return db.prepare(`DELETE FROM ${table} WHERE id = ? AND store_id = ?`).run(rowId, id).changes;
+      const res = await conn.prepare(`DELETE FROM ${table} WHERE id = ? AND store_id = ?`).run(rowId, id);
+      return res.changes;
     },
 
     /**
      * منفذ SQL الحر — للاستعلامات المركّبة (JOIN / GROUP BY).
      * يرفض أي جملة لا تذكر store_id، فلا يمكن تسريب صف عن طريق النسيان.
      */
-    raw(sql, params = []) {
+    async raw(sql, params = []) {
       if (!/\bstore_id\b/.test(sql)) {
         throw new TenancyError('جملة SQL حرة بلا شرط store_id — رُفضت.');
       }
-      return db.prepare(sql).all(...params);
+      return conn.prepare(sql).all(...params);
     },
   };
 
@@ -123,11 +132,15 @@ export function scope(storeId) {
 }
 
 /** فحص انطلاق: يتأكد أن كل جدول تابع يملك فعلاً عمود store_id */
-export function verifyIsolation() {
+export async function verifyIsolation() {
   const missing = [];
+  // information_schema بديل PRAGMA — ونسأل مرة واحدة لا مرة لكل جدول
+  const rows = await db.prepare(
+    `SELECT table_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND column_name = 'store_id'`).all();
+  const have = new Set(rows.map((r) => r.table_name));
   for (const t of TENANT_TABLES) {
-    const cols = db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
-    if (!cols.includes('store_id')) missing.push(t);
+    if (!have.has(t)) missing.push(t);
   }
   if (missing.length) {
     throw new TenancyError(`جداول تابعة بلا عمود store_id: ${missing.join(', ')}`);

@@ -78,13 +78,17 @@ function explainMetaError(status, body) {
  * تسجيل رسالة صادرة كي يجد الـWebhook ما يُحدّثه لاحقاً.
  * لا يُفشل الإرسال أبداً: فشل السجل مشكلة قياس لا مشكلة تسليم.
  */
-function trackOutbound(wamid, phone, kind) {
+async function trackOutbound(wamid, phone, kind) {
   if (!wamid) return;
   try {
     const t = now();
-    db.prepare(`INSERT OR REPLACE INTO wa_messages
+    await db.prepare(`INSERT INTO wa_messages
                 (wamid, phone, kind, status, sent_at, updated_at)
-                VALUES (?,?,?,'sent',?,?)`).run(wamid, phone, kind, t, t);
+                VALUES (?,?,?,'sent',?,?)
+                ON CONFLICT (wamid) DO UPDATE SET
+                  phone = excluded.phone, kind = excluded.kind,
+                  status = excluded.status, updated_at = excluded.updated_at`)
+      .run(wamid, phone, kind, t, t);
   } catch (err) {
     console.error('✖ تعذّر تسجيل رسالة واتساب:', err.message);
   }

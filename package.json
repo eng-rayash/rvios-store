@@ -17,6 +17,11 @@
     "backup": "node --no-warnings ops/backup.mjs",
     "backup:list": "node --no-warnings ops/restore.mjs --list",
     "restore": "node --no-warnings ops/restore.mjs",
-    "test": "npm run reset && node --no-warnings test/smoke.mjs && node --no-warnings test/images.mjs && node --no-warnings test/gallery.mjs && node --no-warnings test/billing.mjs && node --no-warnings test/stores.mjs && node --no-warnings test/pages.mjs && node --no-warnings test/webhook.mjs && node --no-warnings test/infra.mjs && node --no-warnings test/reminders.mjs && node --no-warnings test/pwa.mjs && node --no-warnings test/pagination.mjs"
+    "test": "npm run reset && node --no-warnings test/smoke.mjs && node --no-warnings test/images.mjs && node --no-warnings test/gallery.mjs && node --no-warnings test/billing.mjs && node --no-warnings test/stores.mjs && node --no-warnings test/pages.mjs && node --no-warnings test/webhook.mjs && node --no-warnings test/infra.mjs && node --no-warnings test/reminders.mjs && node --no-warnings test/pwa.mjs && node --no-warnings test/pagination.mjs",
+    "secrets": "node --no-warnings ops/secrets.mjs",
+    "migrate": "node --no-warnings -e \"import('./src/db.js').then(m => m.migrate()).then(() => import('./src/pg.js')).then(m => m.db.close()).then(() => console.log('✔ طُبّق المخطّط'))\""
+  },
+  "dependencies": {
+    "postgres": "^3.4.9"
   }
 }

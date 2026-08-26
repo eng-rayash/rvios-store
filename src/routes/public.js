@@ -17,8 +17,8 @@ import { galleryOf } from '../uploads.js';
 import { planOf } from '../plans.js';
 
 /** يجلب متجراً نشطاً بالرابط، أو يرمي ٤٠٤ */
-export function storeBySlug(slug) {
-  const s = db.prepare('SELECT * FROM stores WHERE slug = ?').get(slug);
+export async function storeBySlug(slug) {
+  const s = await db.prepare('SELECT * FROM stores WHERE slug = ?').get(slug);
   if (!s) notFound('لا يوجد متجر بهذا الرابط');
   if (s.status === 'suspended') {
     const e = new Error('هذا المتجر موقوف مؤقتاً'); e.status = 410; throw e;
@@ -47,14 +47,15 @@ const SORTS = {
   new:  'sort, id DESC',
   low:  'price ASC, id DESC',
   high: 'price DESC, id DESC',
-  name: 'name COLLATE NOCASE ASC',
+  // COLLATE NOCASE لهجة SQLite؛ LOWER() المكافئ المحمول
+  name: 'LOWER(name) ASC',
 };
 
 /**
  * بحث وفلترة وترقيم في الخادم.
  * كل جملة تمرّ عبر scope.raw الذي يرفض SQL بلا store_id (§٥.١).
  */
-function queryProducts(store, query) {
+async function queryProducts(store, query) {
   const s = scope(store.id);
   const page = Math.max(1, toInt(query.get('page'), 1));
   const per = Math.min(48, Math.max(4, toInt(query.get('per'), 12)));
@@ -76,7 +77,8 @@ function queryProducts(store, query) {
 
   const q = clean(query.get('q'), 60);
   if (q) {
-    where.push('(name LIKE ? OR summary LIKE ? OR description LIKE ?)');
+    // ILIKE لا LIKE: الأخيرة حسّاسة لحالة الأحرف في Postgres
+    where.push('(name ILIKE ? OR summary ILIKE ? OR description ILIKE ?)');
     const like = `%${q}%`;
     params.push(like, like, like);
   }
@@ -92,8 +94,8 @@ function queryProducts(store, query) {
   const clause = where.join(' AND ');
   const order = SORTS[query.get('sort')] ?? SORTS.new;
 
-  const total = s.raw(`SELECT COUNT(*) n FROM products WHERE ${clause}`, params)[0].n;
-  const rows = s.raw(
+  const total = await s.raw(`SELECT COUNT(*) n FROM products WHERE ${clause}`, params)[0].n;
+  const rows = await s.raw(
     `SELECT * FROM products WHERE ${clause} ORDER BY ${order} LIMIT ? OFFSET ?`,
     [...params, per, (page - 1) * per],
   );
@@ -108,19 +110,19 @@ function queryProducts(store, query) {
   };
 }
 
-export default function register(r) {
+export default async function register(r) {
 
   // ── بيانات المتجر ─────────────────────────────────────
   //  §٥.٣ — لا نُرسل كتالوجاً كاملاً على إنترنت بطيء:
   //  صفحة واحدة فقط، والبحث والفلترة يجريان في الخادم.
-  r.get('/api/shop/:slug', (req, res) => {
+  r.get('/api/shop/:slug', async (req, res) => {
     const store = storeBySlug(req.params.slug);
     const s = scope(store.id);
 
-    const cats = s.all('categories', {}, { order: 'sort, id' });
-    const counts = Object.fromEntries(
-      cats.map((c) => [c.id, s.count('products', { category_id: c.id, live: 1 })]),
-    );
+    const cats = await s.all('categories', {}, { order: 'sort, id' });
+    const counts = Object.fromEntries(await Promise.all(
+      cats.map(async (c) => [c.id, await s.count('products', { category_id: c.id, live: 1 })]),
+    ));
 
     json(res, {
       store: publicStore(store),
@@ -135,15 +137,15 @@ export default function register(r) {
   });
 
   // ── صفحة منتجات إضافية / بحث ──────────────────────────
-  r.get('/api/shop/:slug/products', (req, res) => {
+  r.get('/api/shop/:slug/products', async (req, res) => {
     const store = storeBySlug(req.params.slug);
     json(res, queryProducts(store, req.query));
   });
 
   // ── منتج واحد — رابط قابل للمشاركة ────────────────────
-  r.get('/api/shop/:slug/products/:id', (req, res) => {
+  r.get('/api/shop/:slug/products/:id', async (req, res) => {
     const store = storeBySlug(req.params.slug);
-    const p = scope(store.id).get('products', { id: toInt(req.params.id), live: 1 });
+    const p = await scope(store.id).get('products', { id: toInt(req.params.id), live: 1 });
     if (!p) notFound('المنتج غير موجود');
     json(res, { store: publicStore(store), product: shape(store, p, { gallery: true }) });
   });
@@ -151,7 +153,7 @@ export default function register(r) {
   // ── تسجيل زيارة (§١٠ — قياس) ──────────────────────────
   //  زوّار فريدون يومياً: بصمة مجزّأة تمنع تضخيم الرقم بكل
   //  تحديث للصفحة، بلا تخزين أي بيانات تعريفية.
-  r.post('/api/shop/:slug/visit', (req, res) => {
+  r.post('/api/shop/:slug/visit', async (req, res) => {
     const store = storeBySlug(req.params.slug);
     const day = today();
 
@@ -159,9 +161,9 @@ export default function register(r) {
       .update(`${store.id}|${day}|${clientIp(req)}|${req.headers['user-agent'] ?? ''}|${VISIT_SALT}`)
       .digest('hex').slice(0, 32);
 
-    const seen = db.prepare('SELECT 1 FROM visit_marks WHERE mark = ?').get(mark);
+    const seen = await db.prepare('SELECT 1 FROM visit_marks WHERE mark = ?').get(mark);
     if (!seen) {
-      db.prepare('INSERT INTO visit_marks (mark, day) VALUES (?,?)').run(mark, day);
+      await db.prepare('INSERT INTO visit_marks (mark, day) VALUES (?,?)').run(mark, day);
       db.prepare(`INSERT INTO visits (store_id, day, count) VALUES (?,?,1)
                   ON CONFLICT(store_id, day) DO UPDATE SET count = count + 1`)
         .run(store.id, day);
@@ -184,7 +186,7 @@ export default function register(r) {
       note:    clean(body.note, 300),
     });
 
-    const full = withItems(store.id, scope(store.id).get('orders', { id: order.id }));
+    const full = withItems(store.id, await scope(store.id).get('orders', { id: order.id }));
 
     // §٣.٣ — سرعة رد التاجر هي عنق الزجاجة، فلا نتركه ينتظر فتح اللوحة.
     // لا ننتظر النتيجة: الطلب مسجّل، والإشعار تحسين لا شرط.
@@ -202,9 +204,9 @@ export default function register(r) {
   });
 
   // ── متابعة طلب برقمه المرجعي ──────────────────────────
-  r.get('/api/shop/:slug/orders/:ref', (req, res) => {
+  r.get('/api/shop/:slug/orders/:ref', async (req, res) => {
     const store = storeBySlug(req.params.slug);
-    const o = scope(store.id).get('orders', { ref: req.params.ref.toUpperCase() });
+    const o = await scope(store.id).get('orders', { ref: req.params.ref.toUpperCase() });
     if (!o) notFound('لا يوجد طلب بهذا الرقم');
     const full = withItems(store.id, o);
     json(res, {
@@ -223,7 +225,7 @@ export default function register(r) {
     const reason = clean(body.reason, 60);
     if (!reason) bad('اختر سبب البلاغ');
 
-    scope(store.id).insert('reports', {
+    await scope(store.id).insert('reports', {
       reason,
       detail: clean(body.detail, 800),
       status: 'open',

@@ -73,7 +73,7 @@ export function dropStoreImages(storeId) {
  * @param {number} max         حد الباقة
  * @returns {string} مسار صورة الغلاف
  */
-export function syncGallery(s, productId, incoming, max) {
+export async function syncGallery(s, productId, incoming, max) {
   const urls = (Array.isArray(incoming) ? incoming : [])
     .filter(Boolean)
     .slice(0, Math.max(1, max))
@@ -81,18 +81,19 @@ export function syncGallery(s, productId, incoming, max) {
     .filter(Boolean);
 
   // نستبدل المعرض بالكامل: الترتيب القادم من الواجهة هو المرجع
-  for (const row of s.all('product_images', { product_id: productId })) {
-    s.remove('product_images', row.id);
+  for (const row of await s.all('product_images', { product_id: productId })) {
+    await s.remove('product_images', row.id);
   }
-  urls.slice(1).forEach((url, i) => {
-    s.insert('product_images', { product_id: productId, url, sort: i + 1 });
-  });
+  // forEach لا تنتظر الوعود — الحلقة تضمن ترتيب الإدراج وإتمامه
+  for (const [i, url] of urls.slice(1).entries()) {
+    await s.insert('product_images', { product_id: productId, url, sort: i + 1 });
+  }
 
   return urls[0] ?? '';
 }
 
 /** يعيد صور المنتج مرتّبة، والغلاف أولاً */
-export function galleryOf(s, product) {
-  const extra = s.all('product_images', { product_id: product.id }, { order: 'sort, id' });
+export async function galleryOf(s, product) {
+  const extra = await s.all('product_images', { product_id: product.id }, { order: 'sort, id' });
   return [product.image, ...extra.map((r) => r.url)].filter(Boolean);
 }

@@ -16,7 +16,7 @@ row('طبقة إعدادات مُتحقَّقة', has('src/config.js'));
 row('  ← مربوطة بالخادم', srcAll.includes('assertConfig(') && read('src/server.js').includes('assertConfig'), 'مكتوبة وغير مستدعاة');
 row('تسجيل منظّم', has('src/logger.js'));
 row('  ← مربوط بالخادم', read('src/server.js').includes('logger.js'), 'مكتوب وغير مستخدم');
-row('ترحيلات مرقّمة', has('src/migrations'), 'DDL في db.js مباشرة');
+row('مخطّط في ملف واحد', has('ops/sql/schema.pg.sql'), 'DDL مبعثر في الكود');
 row('طابور مهام بإعادة محاولة', has('src/jobs.js'), 'الإشعار fire-and-forget');
 // نفحص أن النقطة تستعلم القاعدة فعلاً: خادم يردّ «حيّ» بينما
 // قاعدته مقفلة أسوأ من خادم متوقّف — الوكيل يظل يرسل إليه.
@@ -25,8 +25,8 @@ row('  ← تستعلم القاعدة', /function health[\s\S]{0,400}db\.prepar
 row('إيقاف رشيد', read('src/server.js').includes('SIGTERM') && read('src/server.js').includes('server.close('));
 row('نسخ احتياطي تلقائي', has('src/backup.js'));
 row('  ← مربوط بالخادم', read('src/server.js').includes('startBackups'), 'مكتوب وغير مستدعى');
-row('  ← لقطة متّسقة (VACUUM INTO)', read('src/backup.js').includes('VACUUM INTO'), 'نسخ ملف قد يُنتج قاعدة ممزّقة');
-row('  ← تحقّق من سلامة النسخة', read('src/backup.js').includes('integrity_check'), 'نسخة لم تُفتح ليست نسخة');
+row('  ← لقطة منطقية (pg_dump)', read('src/backup.js').includes('pg_dump'), 'نسخة تُستعاد على أي خادم Postgres');
+row('  ← تحقّق من سلامة النسخة', read('src/backup.js').includes('dump complete'), 'نسخة لم تُفحص ليست نسخة');
 row('  ← استعادة مُختبَرة', has('ops/restore.mjs'));
 row('ضغط brotli/gzip', read('src/server.js').includes('brotliCompress') || read('src/server.js').includes('createBrotliCompress'));
 row('  ← ترويسة Vary', read('src/server.js').includes("vary: 'Accept-Encoding'"), 'الوسيط قد يخدم نسخة خاطئة');
@@ -52,7 +52,7 @@ row('سجل تدقيق', has('src/billing.js') && read('src/billing.js').include
 console.log('\n═══ المنتج ═══');
 row('SSR + Open Graph', has('src/render.js'));
 row('sitemap + robots', read('src/server.js').includes('sitemap.xml'));
-row('حجز المخزون وقت الطلب', read('src/orders.js').includes('BEGIN IMMEDIATE'));
+row('حجز المخزون وقت الطلب', read('src/orders.js').includes('forUpdate: true'));
 row('رسوم التوصيل', read('src/orders.js').includes('deliveryFor'));
 row('صور متعددة للمنتج', read('src/uploads.js').includes('syncGallery'));
 row('تتبّع الطلب للعميل', has('public/track.html'));

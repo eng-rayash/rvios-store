@@ -95,26 +95,20 @@ const { config } = await import('../src/config.js');
   ok(fs.existsSync(file), 'الملف موجود على القرص');
 
   // التحقق يفتح النسخة فعلاً — نسخة لا تُفتح ليست نسخة
-  const { DatabaseSync } = await import('node:sqlite');
-  const snap = new DatabaseSync(file, { readOnly: true });
-  const n = snap.prepare('SELECT COUNT(*) n FROM stores').get().n;
-  snap.close();
-  ok(n === info.stores, 'المحتوى يطابق ما أُعلن');
+  // نسخة pg_dump نصّية: نتحقّق من ختمها ومن ذكرها للجداول
+  const dump = fs.readFileSync(file, 'utf8');
+  ok(/PostgreSQL database dump complete/i.test(dump), 'النسخة مختومة — لم تُبتر');
+  ok(dump.includes('stores'), 'المحتوى يذكر جدول المتاجر');
 }
 {
-  // نسخة تالفة يجب أن تُرفض لا أن تُحفظ
-  const junk = path.join(config.paths.backups, 'rvios-9999-corrupt.db');
-  fs.writeFileSync(junk, 'ليست قاعدة بيانات');
-  const { DatabaseSync } = await import('node:sqlite');
-  let opened = false, handle = null;
-  try {
-    handle = new DatabaseSync(junk, { readOnly: true });
-    handle.prepare('SELECT 1 FROM stores').get();
-    opened = true;
-  } catch { /* المتوقّع */ }
-  // الإغلاق في finally: ويندوز يقفل الملف حتى بعد فتح فاشل
-  finally { try { handle?.close(); } catch { /* لا شيء */ } }
-  ok(!opened, 'ملف تالف لا يُقرأ كقاعدة — التحقق سيرفضه');
+  // نسخة مبتورة يجب أن تُرفض لا أن تُحفظ.
+  // مع pg_dump الاختبار نصّي: غياب سطر الختم علامة البتر.
+  const junk = path.join(config.paths.backups, 'rvios-9999-corrupt.sql');
+  fs.mkdirSync(config.paths.backups, { recursive: true });
+  fs.writeFileSync(junk, '-- بداية نسخة ثم انقطاع\nCREATE TABLE stores (');
+  const tail = fs.readFileSync(junk, 'utf8');
+  const sealed = /PostgreSQL database dump complete/i.test(tail);
+  ok(!sealed, 'ملف مبتور لا يحمل ختم الاكتمال — التحقق سيرفضه');
   fs.unlinkSync(junk);
 }
 

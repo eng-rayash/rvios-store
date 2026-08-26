@@ -31,10 +31,10 @@ export function makeRef() {
   return `RS-${out}`;
 }
 
-function uniqueRef() {
+async function uniqueRef() {
   for (let i = 0; i < 12; i++) {
     const ref = makeRef();
-    if (!db.prepare('SELECT 1 FROM orders WHERE ref = ?').get(ref)) return ref;
+    if (!await db.prepare('SELECT 1 FROM orders WHERE ref = ?').get(ref)) return ref;
   }
   throw new Error('تعذّر توليد رقم مرجعي فريد');
 }
@@ -58,7 +58,7 @@ export function deliveryFor(store, subtotal) {
  * التاجر، لأمكن لعميلين أن يطلبا آخر قطعة وينجح كلاهما.
  * الحجز والقراءة داخل معاملة واحدة لمنع السباق.
  */
-export function placeOrder(storeId, store, { lines, name, phone, note, address }) {
+export async function placeOrder(storeId, store, { lines, name, phone, note, address }) {
   const s = scope(storeId);
 
   if (!Array.isArray(lines) || !lines.length) {
@@ -73,11 +73,16 @@ export function placeOrder(storeId, store, { lines, name, phone, note, address }
     wanted.set(id, (wanted.get(id) ?? 0) + qty);
   }
 
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  /**
+   * معاملة على اتصال محجوز، والصفوف تُقفل بـ FOR UPDATE.
+   * SQLite كان يسلسل الكتابات كلها بـ BEGIN IMMEDIATE. Postgres
+   * يسمح بالتزامن، فالقفل هو ما يمنع بيع القطعة الأخيرة مرتين.
+   */
+  return db.transaction(async (tx) => {
+    const s = scope(storeId, tx);
     const priced = [];
     for (const [id, qty] of wanted) {
-      const product = s.get('products', { id, live: 1 });
+      const product = await s.get('products', { id, live: 1 }, { forUpdate: true });
       if (!product) {
         const e = new Error('منتج غير متاح في هذا المتجر'); e.status = 400; throw e;
       }
@@ -102,7 +107,7 @@ export function placeOrder(storeId, store, { lines, name, phone, note, address }
     const total = subtotal + delivery;
     const ref = uniqueRef();
 
-    const orderId = s.insert('orders', {
+    const orderId = await s.insert('orders', {
       ref,
       cust_name:    name    ?? '',
       cust_phone:   phone   ?? '',
@@ -116,18 +121,15 @@ export function placeOrder(storeId, store, { lines, name, phone, note, address }
     });
 
     for (const l of priced) {
-      s.insert('order_items', { order_id: orderId, ...l });
+      await s.insert('order_items', { order_id: orderId, ...l });
       // حجز الكمية فوراً
-      const p = s.get('products', { id: l.product_id });
-      s.update('products', l.product_id, { qty: Math.max(0, p.qty - l.qty) });
+      const p = await s.get('products', { id: l.product_id }, { forUpdate: true });
+      await s.update('products', l.product_id, { qty: Math.max(0, p.qty - l.qty) });
     }
 
-    db.exec('COMMIT');
+    // لا COMMIT يدوي: sql.begin تُثبّت عند النجاح وتُرجِع عند الرمي
     return { id: orderId, ref, subtotal, delivery, total, items: priced };
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
-  }
+  });
 }
 
 /**
@@ -179,15 +181,15 @@ export function waAsk(store, product) {
   return `https://wa.me/${to}?text=${encodeURIComponent(text)}`;
 }
 
-export function withItems(storeId, order) {
+export async function withItems(storeId, order) {
   const s = scope(storeId);
-  return { ...order, items: s.all('order_items', { order_id: order.id }) };
+  return { ...order, items: await s.all('order_items', { order_id: order.id }) };
 }
 
 /** تغيير الحالة مع احترام الانتقالات المسموحة */
-export function advance(storeId, orderId, to) {
+export async function advance(storeId, orderId, to) {
   const s = scope(storeId);
-  const order = s.get('orders', { id: orderId });
+  const order = await s.get('orders', { id: orderId });
   if (!order) { const e = new Error('الطلب غير موجود'); e.status = 404; throw e; }
 
   const state = ORDER_STATES[order.status];
@@ -198,13 +200,13 @@ export function advance(storeId, orderId, to) {
 
   // المخزون حُجز وقت الطلب، فالإلغاء يعيده — والتأكيد لا يخصم ثانية
   if (to === 'off') {
-    for (const item of s.all('order_items', { order_id: orderId })) {
+    for (const item of await s.all('order_items', { order_id: orderId })) {
       if (!item.product_id) continue;
-      const p = s.get('products', { id: item.product_id });
-      if (p) s.update('products', p.id, { qty: p.qty + item.qty });
+      const p = await s.get('products', { id: item.product_id });
+      if (p) await s.update('products', p.id, { qty: p.qty + item.qty });
     }
   }
 
-  s.update('orders', orderId, { status: to });
-  return s.get('orders', { id: orderId });
+  await s.update('orders', orderId, { status: to });
+  return await s.get('orders', { id: orderId });
 }

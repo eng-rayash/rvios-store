@@ -139,10 +139,9 @@ ok(illegal.status === 409, 'رُفض انتقال غير مسموح (مكتمل 
 
 console.log('\n── أمان رمز التحقق (§٢) ──');
 {
-  const { DatabaseSync } = await import('node:sqlite');
-  const raw = new DatabaseSync('data/rvios.db');
+  const { db } = await import('../src/db.js');
   await j('POST', '/api/auth/request-code', { phone: '770333222' });
-  const stored = raw.prepare('SELECT code FROM otps WHERE phone = ?').get('770333222');
+  const stored = await db.prepare('SELECT code FROM otps WHERE phone = ?').get('770333222');
   ok(/^[a-f0-9]{64}$/.test(stored.code), 'الرمز مخزَّن كتجزئة HMAC لا خاماً (§٢.١)');
 
   const a = await j('POST', '/api/auth/verify', { phone: '779999999', code: '123456' });
