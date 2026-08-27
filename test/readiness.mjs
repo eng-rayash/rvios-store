@@ -5,6 +5,9 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const has = (p) => fs.existsSync(path.join(ROOT, p));
 const read = (p) => { try { return fs.readFileSync(path.join(ROOT, p), 'utf8'); } catch { return ''; } };
+// المخطّط غادر src/db.js إلى ملف SQL عند الهجرة إلى Postgres —
+// وهذا التدقيق يقرأ الكود لا الذاكرة، فليقرأ حيث صار.
+const schema = read('ops/sql/schema.pg.sql');
 const srcAll = ['src', 'src/routes'].flatMap((d) =>
   fs.readdirSync(path.join(ROOT, d)).filter((f) => f.endsWith('.js')).map((f) => read(`${d}/${f}`))).join('\n');
 
@@ -74,7 +77,7 @@ row('  ← توقيع Webhook مُتحقَّق', read('src/routes/webhook.js').i
 row('تذكيرات الاشتراك D-7 / D-1', read('src/billing.js').includes('runReminderSweep')
   && read('src/server.js').includes('runReminderSweep'));
 // المرحلة لا الوقت وحده: بدونها يصل التذكير نفسه كل ٦ ساعات
-row('  ← لا تكرار (notified_stage)', read('src/db.js').includes('notified_stage'));
+row('  ← لا تكرار (notified_stage)', schema.includes('notified_stage'));
 row('ترقيم الطلبات في اللوحة', read('src/routes/merchant.js').includes('ORDERS_PER_PAGE'));
 row('تجميد ٢٤ ساعة عند تغيير الرقم', srcAll.includes('phone_change'));
 row('PWA (manifest + service worker)', has('public/manifest.json'));
@@ -90,6 +93,6 @@ row('شاشة ضبط الأسعار',
   read('public/assets/js/admin.js').includes('/api/admin/settings'));
 
 console.log('\n═══ أرقام ═══');
-const tables = (read('src/db.js').match(/CREATE TABLE IF NOT EXISTS (\w+)/g) ?? []).length;
+const tables = (schema.match(/CREATE TABLE IF NOT EXISTS (\w+)/g) ?? []).length;
 const routes = (srcAll.match(/^\s*r\.(get|post|patch|put|delete)\(/gm) ?? []).length;
 console.log(`  جداول: ${tables} · مسارات API: ${routes}`);

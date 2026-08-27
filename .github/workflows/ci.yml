@@ -122,20 +122,41 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+
+    # الصورة تُقلع بـNODE_ENV=production، وهناك يرفض الإعداد
+    # القاعدةَ الغائبة والأسرارَ الضعيفة. فلتكن القاعدة حقيقية
+    # والأسرار طويلة — وإلا صار هذا الفحص اختبارَ رفضٍ لا إقلاع.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rvios
+          POSTGRES_PASSWORD: rvios
+          POSTGRES_DB: rvios_img
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rvios -d rvios_img"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+
     steps:
       - uses: actions/checkout@v4
       - name: بناء الصورة
         run: docker build -t rvios-store:ci .
       - name: الصورة تُقلع وتردّ على فحص الحياة
         run: |
-          docker run -d --name rv -p 3000:3000 \
-            -e RVIOS_ADMIN_PASS=ci-not-the-default \
-            -e OTP_PEPPER=ci-pepper \
-            -e VISIT_SALT=ci-salt \
+          # ‏--network host: القاعدة خدمة على المُشغّل، و«localhost»
+          # داخل حاوية معزولة يعني الحاوية نفسها لا المُشغّل.
+          docker run -d --name rv --network host \
+            -e DATABASE_URL='postgresql://rvios:rvios@localhost:5432/rvios_img?sslmode=disable' \
+            -e RVIOS_ADMIN_PASS=ci-not-the-default-0192 \
+            -e OTP_PEPPER=ci-pepper-thirty-two-chars-min-0192 \
+            -e VISIT_SALT=ci-salt-sixteen-plus \
             rvios-store:ci
           for i in $(seq 1 30); do
             curl -sf http://localhost:3000/health && break
             sleep 1
           done
-          curl -sf http://localhost:3000/health | grep -q '"ok":true'
+          # المخطّط يُطبَّق عند الإقلاع، فردّ صحّي يعني القاعدة قامت
+          curl -sf http://localhost:3000/health | grep -q '"ok":true' || {
+            echo "✖ لم تقلع الصورة — السجل:"; docker logs rv; exit 1; }
           docker rm -f rv
