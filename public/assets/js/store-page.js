@@ -284,6 +284,7 @@ function cardHtml(p) {
       <div class="buy">
         <button class="add" data-add="${p.id}" ${p.qty <= 0 ? 'disabled' : ''}>
           ${p.qty <= 0 ? 'غير متوفر'
+            : p.hasVariants ? 'اختر الخيار'
             : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 2H2"/></svg>أضف للسلة`}
         </button>
         <a class="wain" href="${escapeHtml(p.wa)}" target="_blank" rel="noopener" aria-label="اسأل عن ${escapeHtml(p.name)}">
@@ -322,16 +323,36 @@ function render() {
 // ═══ السلة ═══════════════════════════════════════════════
 const saveCart = () => ls.set(CART_KEY, cart);
 
-/** السلة تحفظ لقطة من المنتج، لأن المنتج قد لا يكون في الصفحة الحالية */
-function addToCart(id) {
+/**
+ * السلة تحفظ لقطة من المنتج، لأن المنتج قد لا يكون في الصفحة الحالية.
+ * حين يكون للمنتج خيارات فالسطر يخصّ الخيار: مقاسان مختلفان من
+ * القميص نفسه سطران بسعرَين ومخزونَين مستقلَّين.
+ */
+function addToCart(id, variantId = 0) {
   const p = PRODUCTS.find((x) => x.id === id);
-  if (!p || p.qty <= 0) return;
-  const line = cart.find((l) => l.id === id);
+  if (!p) return;
+
+  // منتج بخيارات لا يُضاف من الشبكة — لا بدّ من اختيار أولاً
+  if (p.hasVariants && !variantId) return openProduct(id);
+
+  const v = variantId ? p.variants?.find((x) => x.id === variantId) : null;
+  if (p.hasVariants && !v) return toast('اختر أحد الخيارات المتاحة', 'bad');
+
+  const max = v ? v.qty : p.qty;
+  if (max <= 0) return toast('نفد من المخزون', 'bad');
+
+  const line = cart.find((l) => l.id === id && (l.variantId ?? 0) === variantId);
   if (line) {
-    if (line.qty >= p.qty) return toast(`لا يتوفر أكثر من ${AR(p.qty)} من هذا المنتج`, 'bad');
+    if (line.qty >= max) return toast(`لا يتوفر أكثر من ${AR(max)} من هذا الخيار`, 'bad');
     line.qty++;
   } else {
-    cart.push({ id, qty: 1, name: p.name, price: p.price, image: p.image, variant: p.variant, max: p.qty });
+    cart.push({
+      id, variantId, qty: 1, name: p.name,
+      price: v ? v.price : p.price,
+      image: p.image,
+      variant: v ? v.label : p.variant,
+      max,
+    });
   }
   saveCart(); drawCart(); toast('أُضيف إلى السلة');
 }
@@ -440,6 +461,7 @@ async function openProduct(id) {
         ${DELIVERY.fee ? `<div><span>التوصيل</span><b>${AR(DELIVERY.fee)} ر.ي${DELIVERY.freeOver ? ` · مجاني فوق ${AR(DELIVERY.freeOver)}` : ''}</b></div>`
                        : '<div><span>التوصيل</span><b style="color:var(--ok)">مجاني</b></div>'}
       </div>
+      ${p.hasVariants ? variantPicker(p) : ''}
       <div class="mact">
         <button class="add" data-add="${p.id}" ${p.qty <= 0 ? 'disabled' : ''}>${p.qty > 0 ? 'أضف للسلة' : 'غير متوفر'}</button>
         <a class="wain" href="${escapeHtml(p.wa)}" target="_blank" rel="noopener" aria-label="اسأل عن المنتج">
@@ -450,8 +472,98 @@ async function openProduct(id) {
     </div>`;
 
   if (!PRODUCTS.find((x) => x.id === id)) PRODUCTS.push(p);
+  if (p.hasVariants) bindPicker(p);
   history.replaceState(null, '', `?p=${p.id}`);
   show($('#modal'));
+}
+
+// ═══ منتقي الخيارات ══════════════════════════════════════
+//  محورا الخيارات يُعرضان كأزرار لا كقائمة منسدلة: العميل
+//  يرى المتاح والنافد معاً في نظرة واحدة، والقائمة تُخفيه.
+
+/** الخيار المطابق للاختيار الحالي على المحورين */
+function matchVariant(p, sel) {
+  return p.variants.find((v) =>
+    (!p.axes.some((a) => a.key === 'v1') || v.v1 === sel.v1) &&
+    (!p.axes.some((a) => a.key === 'v2') || v.v2 === sel.v2));
+}
+
+/** هل توجد قطعة متاحة واحدة على الأقل بهذه القيمة على هذا المحور؟ */
+function valueAvailable(p, key, value, sel) {
+  return p.variants.some((v) => {
+    if (v[key] !== value) return false;
+    const other = key === 'v1' ? 'v2' : 'v1';
+    if (p.axes.some((a) => a.key === other) && sel[other] && v[other] !== sel[other]) return false;
+    return v.qty > 0;
+  });
+}
+
+function variantPicker(p) {
+  return `<div class="vpick" id="vPick">
+    ${p.axes.map((axis) => `
+      <div class="vaxis" data-key="${axis.key}">
+        <span class="vlab">${escapeHtml(axis.name || 'اختر')}</span>
+        <div class="vopts">
+          ${axis.values.map((val) => `
+            <button type="button" class="vopt" data-key="${axis.key}" data-val="${escapeHtml(val)}">
+              ${escapeHtml(val)}
+            </button>`).join('')}
+        </div>
+      </div>`).join('')}
+    <div class="vstate" id="vState" role="status" aria-live="polite"></div>
+  </div>`;
+}
+
+function bindPicker(p) {
+  const sel = { v1: '', v2: '' };
+  const addBtn = $('#mg .mact .add');
+
+  const paint = () => {
+    $$('#vPick .vopt').forEach((b) => {
+      const key = b.dataset.key, val = b.dataset.val;
+      b.classList.toggle('on', sel[key] === val);
+      const gone = !valueAvailable(p, key, val, sel);
+      b.classList.toggle('out', gone);
+      b.disabled = gone && sel[key] !== val;
+    });
+
+    const need = p.axes.filter((a) => !sel[a.key]);
+    if (need.length) {
+      $('#vState').textContent = `اختر ${need.map((a) => a.name || 'الخيار').join(' و')}`;
+      addBtn.disabled = true;
+      addBtn.textContent = 'أضف للسلة';
+      addBtn.dataset.variant = '';
+      return;
+    }
+
+    const v = matchVariant(p, sel);
+    if (!v || v.qty <= 0) {
+      $('#vState').textContent = 'هذا الخيار غير متوفر حالياً';
+      addBtn.disabled = true;
+      addBtn.textContent = 'غير متوفر';
+      addBtn.dataset.variant = '';
+      return;
+    }
+
+    // السعر قد يختلف بين الخيارات، فيتحدّث العنوان مع الاختيار
+    $('#mg .mp').innerHTML = `${AR(v.price)} <em>ر.ي</em>`;
+    $('#vState').textContent = v.qty <= 5
+      ? `بقي ${AR(v.qty)} فقط من هذا الخيار`
+      : 'متوفر';
+    addBtn.disabled = false;
+    addBtn.textContent = 'أضف للسلة';
+    addBtn.dataset.variant = v.id;
+  };
+
+  $('#vPick').addEventListener('click', (e) => {
+    const b = e.target.closest('.vopt');
+    if (!b) return;
+    // النقر على المحدَّد يلغيه، فيستطيع العميل التراجع
+    sel[b.dataset.key] = sel[b.dataset.key] === b.dataset.val ? '' : b.dataset.val;
+    paint();
+  });
+
+  paint();
 }
 
 function show(panel) {
@@ -592,7 +704,15 @@ function wire() {
     }
 
     if (e.target.closest('#loadMore')) { load(PAGE + 1, true); return; }
-    if (add) { addToCart(Number(add.dataset.add)); if ($('#modal').classList.contains('on')) closeOverlay?.(); return; }
+    if (add) {
+      // زر النافذة يحمل الخيار المختار؛ زر البطاقة لا يحمل شيئاً
+      const variantId = Number(add.dataset.variant) || 0;
+      const opened = $('#modal').classList.contains('on');
+      addToCart(Number(add.dataset.add), variantId);
+      // لا نغلق النافذة إن كان النقر هو ما فتحها للتوّ لاختيار خيار
+      if (opened) closeOverlay?.();
+      return;
+    }
     if (open) { openProduct(Number(open.dataset.open)); return; }
 
     if (fav) {
@@ -663,7 +783,7 @@ function wire() {
   // ═══ تأكيد الطلب (§٤.١) ═══════════════════════════════
   $('#waBtn').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
     const res = await api.post(`/api/shop/${encodeURIComponent(SLUG)}/orders`, {
-      lines: cart.map((l) => ({ id: l.id, qty: l.qty })),
+      lines: cart.map((l) => ({ id: l.id, variantId: l.variantId ?? 0, qty: l.qty })),
       name: $('#cName').value.trim(),
       address: $('#cAddress')?.value.trim() ?? '',
       note: $('#cNote').value.trim(),

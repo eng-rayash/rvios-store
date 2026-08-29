@@ -287,3 +287,39 @@ tbody tr:hover{background:var(--cream)}
   .linkchip{display:none}
   table{display:block;overflow-x:auto;white-space:nowrap}
 }
+
+/* ═══ خيارات المنتج (مقاسات / ألوان) ═══════════════════════
+   الشبكة تُحرَّر مباشرةً بلا نوافذ متداخلة: صفٌّ لكل خيار،
+   وأعمدته ثابتة العرض فتُقرأ الأرقام في عمود واحد. */
+.vbox{border:1.5px solid var(--line);border-radius:var(--r-sm);
+  background:var(--paper);padding:12px 14px;margin-bottom:16px}
+.vhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.vhead .chk{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);font-weight:700}
+.vcount{font-size:var(--fs-2xs);color:var(--soft);font-weight:700;white-space:nowrap}
+
+#vBody{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.vaxes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.vaxes .field{margin-bottom:12px}
+.vaxes .field i{font-style:normal;font-weight:400;color:var(--soft)}
+
+.vgrid{display:grid;gap:7px;margin-bottom:10px}
+.vrow{display:grid;gap:6px;align-items:center;
+  grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) minmax(0,1fr) 26px}
+.vrow.two,.vgrid.two .vrow{grid-template-columns:minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,.7fr) minmax(0,.9fr) 26px}
+.vrow input{width:100%;padding:7px 9px;border:1.5px solid var(--line);border-radius:var(--r-sm);
+  background:var(--cream);font-size:var(--fs-xs)}
+.vrow input:focus-visible{border-color:var(--shop)}
+.vrow input[type=number]{font-variant-numeric:tabular-nums}
+.vrow .del{width:26px;height:26px;border-radius:50%;background:var(--sand);color:var(--soft);
+  display:grid;place-items:center;font-size:var(--fs-md);line-height:1}
+.vrow .del:hover{background:var(--danger);color:#fff}
+.vhint{font-size:var(--fs-2xs);color:var(--soft);margin-top:8px;line-height:1.6}
+
+/* الكمية تصير مجموعاً محسوباً حين تُفعَّل الخيارات */
+.field.is-derived > span::after{content:' · محسوبة من الخيارات';font-weight:400;color:var(--soft)}
+.field.is-derived input{background:var(--sand);color:var(--soft);cursor:not-allowed}
+
+@media (max-width:520px){
+  .vaxes{grid-template-columns:1fr}
+  .vrow,.vrow.two,.vgrid.two .vrow{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 26px}
+}

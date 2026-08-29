@@ -250,3 +250,47 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS cust_address TEXT NOT NULL DEFAULT '
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS store_slots INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS active_store_id INTEGER;
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS notified_stage TEXT;
+
+
+-- ═══════════════════════════════════════════════════════════
+--  خيارات المنتج (المقاسات والألوان)
+--
+--  محورا الخيارات يُسمّيان على المنتج نفسه (opt1_name/opt2_name)
+--  لا على كل صفّ، فلا يمكن أن يكتب التاجر «المقاس» مرة و«مقاس»
+--  مرة أخرى داخل المنتج الواحد. والصفوف في product_variants
+--  تحمل القيم فقط.
+--
+--  products.qty يبقى مصدر الحقيقة حين has_variants = 0، ويصير
+--  مجموعاً مخزَّناً لكميات الخيارات حين تساوي 1 — يُعاد حسابه
+--  داخل المعاملة نفسها في src/variants.js فلا ينحرف.
+-- ═══════════════════════════════════════════════════════════
+ALTER TABLE products ADD COLUMN IF NOT EXISTS has_variants INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS opt1_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS opt2_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS product_variants (
+  id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  store_id   INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  v1         TEXT NOT NULL DEFAULT '',
+  v2         TEXT NOT NULL DEFAULT '',
+  -- سعر خاص بالخيار؛ NULL يعني «يرث سعر المنتج»
+  price      INTEGER,
+  qty        INTEGER NOT NULL DEFAULT 0,
+  sku        TEXT NOT NULL DEFAULT '',
+  image      TEXT NOT NULL DEFAULT '',
+  live       INTEGER NOT NULL DEFAULT 1,
+  sort       INTEGER NOT NULL DEFAULT 0
+);
+
+-- تركيبة القيمتين فريدة داخل المنتج الواحد
+CREATE UNIQUE INDEX IF NOT EXISTS ux_variant_combo
+  ON product_variants(product_id, v1, v2);
+CREATE INDEX IF NOT EXISTS ix_variants_product ON product_variants(product_id, sort);
+CREATE INDEX IF NOT EXISTS ix_variants_store   ON product_variants(store_id);
+
+-- الخيار المطلوب يُحفَظ في سطر الطلب: variant النصّي يبقى للسجل
+-- التاريخي (لو حُذف الخيار لاحقاً)، وvariant_id لإعادة المخزون
+-- عند الإلغاء.
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id INTEGER;

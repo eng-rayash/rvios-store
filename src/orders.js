@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import { db, now } from './db.js';
 import { scope } from './tenancy.js';
 import { intlPhone } from './auth.js';
+import { pickVariant, variantLabel, variantPrice, recalcStock } from './variants.js';
 
 export const ORDER_STATES = {
   wait: { id: 'wait', label: 'قيد التأكيد', next: ['ok', 'off'] },
@@ -65,12 +66,16 @@ export async function placeOrder(storeId, store, { lines, name, phone, note, add
     const e = new Error('السلة فارغة'); e.status = 400; throw e;
   }
 
-  // دمج الأسطر المكرّرة لنفس المنتج قبل فحص المخزون
+  // دمج الأسطر المكرّرة قبل فحص المخزون. المفتاح يشمل الخيار:
+  // «قميص مقاس M» و«قميص مقاس L» سطران مستقلان لا سطر واحد.
   const wanted = new Map();
   for (const line of lines.slice(0, 50)) {
     const id = Number(line.id);
+    const variantId = Number(line.variantId) || 0;
     const qty = Math.max(1, Math.min(99, Number(line.qty) || 1));
-    wanted.set(id, (wanted.get(id) ?? 0) + qty);
+    const key = `${id}|${variantId}`;
+    const prev = wanted.get(key);
+    wanted.set(key, { id, variantId, qty: (prev?.qty ?? 0) + qty });
   }
 
   /**
@@ -81,23 +86,33 @@ export async function placeOrder(storeId, store, { lines, name, phone, note, add
   return db.transaction(async (tx) => {
     const s = scope(storeId, tx);
     const priced = [];
-    for (const [id, qty] of wanted) {
+    for (const { id, variantId, qty } of wanted.values()) {
       const product = await s.get('products', { id, live: 1 }, { forUpdate: true });
       if (!product) {
         const e = new Error('منتج غير متاح في هذا المتجر'); e.status = 400; throw e;
       }
-      if (product.qty <= 0) {
-        const e = new Error(`«${product.name}» نفد من المخزون`); e.status = 409; throw e;
+
+      // حين يملك المنتج خيارات فالمخزون والسعر يخصّان الخيار،
+      // لا المنتج — وproducts.qty مجرد مجموع لا يُخصم منه هنا.
+      const variant = await pickVariant(s, product, variantId, { forUpdate: true });
+      const stock = variant ? variant.qty : product.qty;
+      const label = variant ? variantLabel(product, variant) : product.variant;
+      const named = variant ? `«${product.name}» (${label})` : `«${product.name}»`;
+
+      if (stock <= 0) {
+        const e = new Error(`${named} نفد من المخزون`); e.status = 409; throw e;
       }
-      if (product.qty < qty) {
-        const e = new Error(`لا يتوفر من «${product.name}» سوى ${product.qty.toLocaleString('ar-EG')}`);
+      if (stock < qty) {
+        const e = new Error(`لا يتوفر من ${named} سوى ${stock.toLocaleString('ar-EG')}`);
         e.status = 409; throw e;
       }
+
       priced.push({
         product_id: product.id,
+        variant_id: variant ? variant.id : null,
         name: product.name,
-        variant: product.variant,
-        price: product.price,
+        variant: label,
+        price: variant ? variantPrice(product, variant) : product.price,
         qty,
       });
     }
@@ -120,12 +135,22 @@ export async function placeOrder(storeId, store, { lines, name, phone, note, add
       created_at: now(),
     });
 
+    const touched = new Set();
     for (const l of priced) {
       await s.insert('order_items', { order_id: orderId, ...l });
-      // حجز الكمية فوراً
-      const p = await s.get('products', { id: l.product_id }, { forUpdate: true });
-      await s.update('products', l.product_id, { qty: Math.max(0, p.qty - l.qty) });
+
+      // حجز الكمية فوراً — على الخيار إن وُجد، وإلا على المنتج
+      if (l.variant_id) {
+        const v = await s.get('product_variants', { id: l.variant_id }, { forUpdate: true });
+        await s.update('product_variants', l.variant_id, { qty: Math.max(0, v.qty - l.qty) });
+        touched.add(l.product_id);
+      } else {
+        const p = await s.get('products', { id: l.product_id }, { forUpdate: true });
+        await s.update('products', l.product_id, { qty: Math.max(0, p.qty - l.qty) });
+      }
     }
+    // مجموع المنتج يُعاد حسابه مرة واحدة بعد كل خياراته
+    for (const productId of touched) await recalcStock(s, productId);
 
     // لا COMMIT يدوي: sql.begin تُثبّت عند النجاح وتُرجِع عند الرمي
     return { id: orderId, ref, subtotal, delivery, total, items: priced };
@@ -200,11 +225,22 @@ export async function advance(storeId, orderId, to) {
 
   // المخزون حُجز وقت الطلب، فالإلغاء يعيده — والتأكيد لا يخصم ثانية
   if (to === 'off') {
+    const touched = new Set();
     for (const item of await s.all('order_items', { order_id: orderId })) {
       if (!item.product_id) continue;
+      if (item.variant_id) {
+        // الخيار قد يكون حُذف بعد الطلب؛ حينها لا مكان تُعاد إليه
+        const v = await s.get('product_variants', { id: item.variant_id });
+        if (v) {
+          await s.update('product_variants', v.id, { qty: v.qty + item.qty });
+          touched.add(item.product_id);
+        }
+        continue;
+      }
       const p = await s.get('products', { id: item.product_id });
       if (p) await s.update('products', p.id, { qty: p.qty + item.qty });
     }
+    for (const productId of touched) await recalcStock(s, productId);
   }
 
   await s.update('orders', orderId, { status: to });

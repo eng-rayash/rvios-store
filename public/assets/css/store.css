@@ -374,3 +374,21 @@ html[dir=rtl] .drawer{transform:translateX(-100%)}
   .hcta{flex-direction:column}
   .hcta .btn{width:100%}
 }
+
+/* ═══ منتقي خيارات المنتج ═══════════════════════════════════
+   أزرار لا قائمة منسدلة: العميل يرى المتاح والنافد معاً،
+   والنافد يبقى ظاهراً مشطوباً بدل أن يختفي — فيعرف أن المقاس
+   موجود في المتجر ونفد، لا أنه غير مصنوع أصلاً. */
+.vpick{display:grid;gap:14px;margin:18px 0 4px}
+.vaxis{display:grid;gap:7px}
+.vlab{font-size:var(--fs-xs);font-weight:700;color:var(--soft)}
+.vopts{display:flex;flex-wrap:wrap;gap:7px}
+.vopt{min-width:44px;padding:8px 14px;border-radius:var(--r-pill);
+  border:1.5px solid var(--line);background:var(--paper);color:var(--ink);
+  font-size:var(--fs-sm);font-weight:700;transition:border-color .18s,background .18s,color .18s}
+.vopt:hover:not(:disabled){border-color:var(--shop)}
+.vopt.on{background:var(--shop);border-color:var(--shop);color:var(--on-shop)}
+.vopt.out{color:var(--soft);border-style:dashed;text-decoration:line-through;opacity:.65}
+.vopt.out.on{background:transparent;color:var(--soft);border-color:var(--line)}
+.vopt:disabled{cursor:not-allowed}
+.vstate{font-size:var(--fs-xs);font-weight:700;color:var(--soft);min-height:1.2em}

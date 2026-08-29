@@ -327,6 +327,31 @@
     <label class="field"><span>الكمية</span><input type="number" id="fQty" min="0" inputmode="numeric"></label>
     <label class="field"><span>الحجم / الوحدة</span><input type="text" id="fVariant" placeholder="١٠٠ مل"></label>
   </div>
+
+  <!-- خيارات المنتج: مقاسات وألوان. مطويّة افتراضياً لأن أكثر
+       المنتجات بلا خيارات، وفتحها يحوّل «الكمية» أعلاه إلى مجموع
+       محسوب لا حقلاً يُكتب. -->
+  <div class="vbox" id="vBox">
+    <div class="vhead">
+      <label class="chk"><input type="checkbox" id="fHasVariants"> لهذا المنتج خيارات (مقاسات أو ألوان)</label>
+      <span class="vcount" id="vCount" hidden></span>
+    </div>
+
+    <div id="vBody" hidden>
+      <div class="vaxes">
+        <label class="field"><span>اسم الخيار الأول</span>
+          <input type="text" id="fOpt1" maxlength="24" placeholder="المقاس"></label>
+        <label class="field"><span>اسم الخيار الثاني <i>اختياري</i></span>
+          <input type="text" id="fOpt2" maxlength="24" placeholder="اللون"></label>
+      </div>
+
+      <div class="vgrid" id="vRows"></div>
+
+      <button type="button" class="btn btn-line btn-sm" id="vAdd">+ إضافة خيار</button>
+      <p class="vhint" id="vHint"></p>
+    </div>
+  </div>
+
   <label class="field"><span>وصف مختصر</span><input type="text" id="fSummary" maxlength="120" placeholder="عطري منعش"></label>
   <label class="field"><span>الوصف الكامل</span><textarea id="fDesc" maxlength="1200"></textarea></label>
   <label class="chk" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fLive" checked> منشور في المتجر</label>

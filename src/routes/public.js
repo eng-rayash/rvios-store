@@ -15,6 +15,7 @@ import { publicStore } from './merchant.js';
 import { notifyNewOrder } from '../notify.js';
 import { galleryOf } from '../uploads.js';
 import { planOf } from '../plans.js';
+import { variantsOf, publicVariant, axesOf } from '../variants.js';
 
 /** يجلب متجراً نشطاً بالرابط، أو يرمي ٤٠٤ */
 export async function storeBySlug(slug) {
@@ -27,10 +28,21 @@ export async function storeBySlug(slug) {
 }
 
 async function shape(store, p, { gallery = false } = {}) {
+  // الخيارات تُجلب مع صفحة المنتج فقط: شبكة المنتجات لا تعرض
+  // مقاسات، وجلبها لكل بطاقة يعني استعلاماً لكل صفّ.
+  const variants = gallery && p.has_variants
+    ? (await variantsOf(scope(store.id), p.id)).filter((v) => v.live)
+    : [];
+
   return {
     id: p.id, name: p.name, summary: p.summary, description: p.description,
     variant: p.variant, price: p.price, oldPrice: p.old_price,
     qty: p.qty, image: p.image, categoryId: p.category_id,
+    hasVariants: !!p.has_variants,
+    ...(gallery && p.has_variants ? {
+      variants: variants.map((v) => publicVariant(p, v)),
+      axes: axesOf(p, variants),
+    } : {}),
     // المعرض يُجلب عند الحاجة فقط — الشبكة تكتفي بالغلاف
     ...(gallery ? { images: await galleryOf(scope(store.id), p) } : {}),
     // §٣.٤ — مؤشر توفّر صادق بدل نجوم تقييم غير حقيقية

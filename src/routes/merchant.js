@@ -15,6 +15,7 @@ import { SKINS } from '../../public/assets/js/theme-core.js';
 import { ORDER_STATES, withItems, advance, waLink, waAsk } from '../orders.js';
 import { checkSlug } from '../slug.js';
 import { saveImage, syncGallery, galleryOf, dropStoreImages } from '../uploads.js';
+import { syncVariants, variantsOf } from '../variants.js';
 import {
   subscriptionOf, planPrices, addonPrices, paymentMethods, YEARLY_MONTHS_FREE,
   createInvoice, submitProof, hiddenByPlanCount, slotsOf,
@@ -140,6 +141,7 @@ export default async function register(r) {
         ...p,
         categoryName: catName[p.category_id] ?? '',
         images: await galleryOf(s, p),
+        variants: p.has_variants ? await variantsOf(s, p.id) : [],
       }))),
       capacity: {
         used: products.length,
@@ -147,6 +149,7 @@ export default async function register(r) {
         label: capacityLabel(store, products.length),
         canAdd: canAddProduct(store, products.length),
         imagesPerProduct: plan.imagesPerProduct,
+        variantsPerProduct: plan.variantsPerProduct === Infinity ? null : plan.variantsPerProduct,
       },
     });
   });
@@ -165,6 +168,7 @@ export default async function register(r) {
     const body = await readBody(req);
     const id = await s.insert('products', await productFields(body, s, true));
     await applyGallery(s, store, id, body);
+    await applyVariants(s, store, id, body);
     json(res, { ok: true, product: await withGallery(s, await s.get('products', { id })) }, 201);
   });
 
@@ -176,6 +180,7 @@ export default async function register(r) {
     const body = await readBody(req);
     await s.update('products', id, await productFields(body, s, false));
     await applyGallery(s, store, id, body);
+    await applyVariants(s, store, id, body);
     json(res, { ok: true, product: await withGallery(s, await s.get('products', { id })) });
   });
 
@@ -508,9 +513,26 @@ async function applyGallery(s, store, productId, body) {
   await s.update('products', productId, { image: cover });
 }
 
-/** يضيف مصفوفة الصور إلى صف المنتج */
+/**
+ * يحفظ شبكة الخيارات ضمن حدّ الباقة.
+ *
+ * الكمية تُدار من هنا حين توجد خيارات، فحقل qty القادم من
+ * الواجهة يُتجاهل عمداً في تلك الحالة — وإلا لدَاس المجموعَ
+ * المحسوب رقمٌ قديم في نموذج التاجر.
+ */
+async function applyVariants(s, store, productId, body) {
+  if (body.variants === undefined) return;
+  const product = await s.get('products', { id: productId });
+  await syncVariants(s, store, product, body.variants);
+}
+
+/** يضيف الصور والخيارات إلى صف المنتج */
 async function withGallery(s, product) {
-  return { ...product, images: await galleryOf(s, product) };
+  return {
+    ...product,
+    images: await galleryOf(s, product),
+    variants: product.has_variants ? await variantsOf(s, product.id) : [],
+  };
 }
 
 async function productFields(body, s, isNew) {
@@ -519,6 +541,9 @@ async function productFields(body, s, isNew) {
   if (body.summary     !== undefined) f.summary     = clean(body.summary, 120);
   if (body.description !== undefined) f.description = clean(body.description, 1200);
   if (body.variant     !== undefined) f.variant     = clean(body.variant, 40);
+  if (body.opt1Name    !== undefined) f.opt1_name   = clean(body.opt1Name, 24);
+  if (body.opt2Name    !== undefined) f.opt2_name   = clean(body.opt2Name, 24);
+  if (body.lowStock    !== undefined) f.low_stock   = Math.max(0, toInt(body.lowStock));
   if (body.image       !== undefined) f.image       = await saveImage(s.storeId, 'products', body.image);
   if (body.price       !== undefined) f.price       = Math.max(0, toInt(body.price));
   if (body.qty         !== undefined) f.qty         = Math.max(0, toInt(body.qty));

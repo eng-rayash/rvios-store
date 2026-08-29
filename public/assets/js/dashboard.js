@@ -24,7 +24,7 @@ let SKINS = [];
 
 let STORE = null, CATS = [], PRODUCTS = [], PLAN = null, CAPACITY = {};
 let STORES = [], SLOTS = { owned: 1, slots: 1, free: 0 };
-let draft = { images: [] };  // تعديلات غير محفوظة (إعدادات + معرض المنتج)
+let draft = { images: [], variants: [] };  // تعديلات غير محفوظة (إعدادات + معرض المنتج + خياراته)
 let editingId = null;
 let closeSheet = null;
 let orderFilter = 'all';
@@ -690,6 +690,66 @@ function paintGallery() {
   $('#pImgDrop').hidden = draft.images.length >= max;
 }
 
+// ═══ خيارات المنتج ═══════════════════════════════════════
+//  الشبكة تُرسل كاملة عند الحفظ، والخادم يستبدل بها ما كان.
+//  الاستبدال — لا الدمج — هو ما يجعل حذف صفّ من الواجهة ممكناً.
+
+/** الحدّ المسموح في الباقة؛ null يعني بلا حدّ */
+const variantMax = () => CAPACITY.variantsPerProduct ?? null;
+
+function paintVariants() {
+  const on = $('#fHasVariants').checked;
+  $('#vBody').hidden = !on;
+  $('#vCount').hidden = !on;
+
+  // الكمية أعلاه تصير مجموعاً محسوباً، فلا تُترك قابلة للتحرير
+  const qty = $('#fQty');
+  qty.disabled = on;
+  qty.closest('.field').classList.toggle('is-derived', on);
+  if (on) {
+    const total = draft.variants.reduce((a, v) => a + (Number(v.qty) || 0), 0);
+    qty.value = total;
+    $('#vCount').textContent = `${AR(draft.variants.length)} خيار · المجموع ${AR(total)} قطعة`;
+  }
+  if (!on) return;
+
+  const two = $('#fOpt2').value.trim();
+  $('#vRows').classList.toggle('two', !!two);
+
+  $('#vRows').innerHTML = draft.variants.map((v, i) => `
+    <div class="vrow" data-i="${i}">
+      <input type="text" data-v="v1" value="${escapeHtml(v.v1 ?? '')}"
+             placeholder="${escapeHtml($('#fOpt1').value.trim() || 'القيمة')}" maxlength="40" aria-label="القيمة الأولى">
+      ${two ? `<input type="text" data-v="v2" value="${escapeHtml(v.v2 ?? '')}"
+             placeholder="${escapeHtml(two)}" maxlength="40" aria-label="القيمة الثانية">` : ''}
+      <input type="number" data-v="qty" value="${Number(v.qty) || 0}" min="0" inputmode="numeric" aria-label="الكمية">
+      <input type="number" data-v="price" value="${v.price ?? ''}" min="0" inputmode="numeric"
+             placeholder="سعر المنتج" aria-label="سعر خاص">
+      <button type="button" class="del" data-rmvar="${i}" title="حذف الخيار" aria-label="حذف الخيار">×</button>
+    </div>`).join('');
+
+  const max = variantMax();
+  $('#vAdd').disabled = max !== null && draft.variants.length >= max;
+  $('#vHint').textContent = max === null
+    ? 'اترك حقل السعر فارغاً ليرث الخيارُ سعرَ المنتج.'
+    : `اترك السعر فارغاً ليرث سعر المنتج · حدّ باقتك ${AR(max)} خيارات لكل منتج.`;
+}
+
+/** يقرأ الشبكة من الحقول إلى draft قبل أي إعادة رسم أو حفظ */
+function readVariants() {
+  $$('#vRows .vrow').forEach((row) => {
+    const i = Number(row.dataset.i);
+    const v = draft.variants[i];
+    if (!v) return;
+    row.querySelectorAll('[data-v]').forEach((input) => {
+      const key = input.dataset.v;
+      if (key === 'qty')        v.qty = Math.max(0, Number(input.value) || 0);
+      else if (key === 'price') v.price = input.value === '' ? null : Math.max(0, Number(input.value) || 0);
+      else                      v[key] = input.value;
+    });
+  });
+}
+
 function openSheet(product) {
   editingId = product?.id ?? null;
   $('#pSheetTitle').textContent = product ? 'تعديل المنتج' : 'منتج جديد';
@@ -698,6 +758,13 @@ function openSheet(product) {
   $('#fOld').value     = product?.old_price ?? '';
   $('#fQty').value     = product?.qty ?? 1;
   $('#fVariant').value = product?.variant ?? '';
+  $('#fOpt1').value    = product?.opt1_name ?? '';
+  $('#fOpt2').value    = product?.opt2_name ?? '';
+  draft.variants = (product?.variants ?? []).map((v) => ({
+    id: v.id, v1: v.v1, v2: v.v2, qty: v.qty, price: v.price,
+  }));
+  $('#fHasVariants').checked = !!product?.has_variants;
+  paintVariants();
   $('#fSummary').value = product?.summary ?? '';
   $('#fDesc').value    = product?.description ?? '';
   $('#fLive').checked  = product ? !!product.live : true;
@@ -934,7 +1001,48 @@ function wire() {
   $('#pCancel').addEventListener('click', () => closeSheet?.());
   $('#veil').addEventListener('click', () => closeSheet?.());
 
+  // ── خيارات المنتج ──
+  $('#fHasVariants').addEventListener('change', () => {
+    // أول تفعيل يبدأ بصفّ واحد فارغ — شبكة فارغة تماماً تربك
+    if ($('#fHasVariants').checked && !draft.variants.length) {
+      draft.variants = [{ v1: '', v2: '', qty: 0, price: null }];
+    }
+    paintVariants();
+  });
+
+  $('#vAdd').addEventListener('click', () => {
+    readVariants();
+    const max = variantMax();
+    if (max !== null && draft.variants.length >= max) return;
+    draft.variants.push({ v1: '', v2: '', qty: 0, price: null });
+    paintVariants();
+    $('#vRows .vrow:last-child [data-v="v1"]')?.focus();
+  });
+
+  $('#vRows').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-rmvar]');
+    if (!btn) return;
+    readVariants();
+    draft.variants.splice(Number(btn.dataset.rmvar), 1);
+    paintVariants();
+  });
+
+  // المجموع يتحدّث مع الكتابة، فيرى التاجر أثر رقمه فوراً
+  $('#vRows').addEventListener('input', (e) => {
+    if (e.target.dataset.v !== 'qty') return;
+    readVariants();
+    const total = draft.variants.reduce((a, v) => a + (Number(v.qty) || 0), 0);
+    $('#fQty').value = total;
+    $('#vCount').textContent = `${AR(draft.variants.length)} خيار · المجموع ${AR(total)} قطعة`;
+  });
+
+  // تغيير اسم المحور الثاني يُظهر عموده أو يُخفيه
+  $('#fOpt2').addEventListener('change', () => { readVariants(); paintVariants(); });
+  $('#fOpt1').addEventListener('change', () => { readVariants(); paintVariants(); });
+
   $('#pSave').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    readVariants();
+    const hasVariants = $('#fHasVariants').checked;
     const payload = {
       name: $('#fName').value.trim(),
       categoryId: Number($('#fCat').value) || 0,
@@ -942,12 +1050,23 @@ function wire() {
       oldPrice: Number($('#fOld').value) || 0,
       qty: Number($('#fQty').value) || 0,
       variant: $('#fVariant').value.trim(),
+      opt1Name: $('#fOpt1').value.trim(),
+      opt2Name: $('#fOpt2').value.trim(),
+      // مصفوفة فارغة تعني «ألغِ الخيارات» — والخادم يعيد qty
+      // ليكون مصدر الحقيقة عندها
+      variants: hasVariants
+        ? draft.variants.filter((v) => (v.v1 ?? '').trim() || (v.v2 ?? '').trim())
+        : [],
       summary: $('#fSummary').value.trim(),
       description: $('#fDesc').value.trim(),
       live: $('#fLive').checked,
       images: draft.images,        // الأولى تصبح الغلاف في الخادم
     };
     if (!payload.name) throw new Error('اسم المنتج مطلوب');
+    if (hasVariants && !payload.variants.length) {
+      throw new Error('أضف قيمة واحدة على الأقل، أو أزل علامة «لهذا المنتج خيارات»');
+    }
+    if (hasVariants && !payload.opt1Name) throw new Error('سمِّ الخيار الأول (مثل: المقاس)');
 
     if (editingId) await api.patch(`/api/me/products/${editingId}`, payload);
     else           await api.post('/api/me/products', payload);
@@ -1034,7 +1153,10 @@ function wire() {
 
     const res = await api.patch('/api/me/store', payload);
     STORE = res.store;
-    draft = { images: draft.images ?? [] };   // لا نمسح معرض منتج مفتوح
+    // حفظ الإعدادات يمسح مسوّدة الإعدادات وحدها. معرض المنتج
+    // المفتوح وخياراته يبقيان — إسقاطهما هنا يفقد التاجر شبكة
+    // مقاسات كتبها للتوّ بلا أي إشارة.
+    draft = { images: draft.images ?? [], variants: draft.variants ?? [] };
     applyTheme(STORE);
     paintHeader();
     fillSettings();

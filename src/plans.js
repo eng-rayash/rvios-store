@@ -29,6 +29,10 @@ export const PLANS = {
     priceUsd: 0,
     products: 15,
     imagesPerProduct: 1,
+    // خيارات المنتج (مقاسات/ألوان) متاحة للجميع — متجر أزياء بلا
+    // مقاسات ليس متجر أزياء، ومنعها في المجانية يطرد أكبر قطاع
+    // في السوق قبل أن يجرّب. الحدّ كمّي لا وظيفي.
+    variantsPerProduct: 5,
     subcategories: false,
     stats: 'none',
     canVerify: false,
@@ -51,6 +55,7 @@ export const PLANS = {
     priceUsd: 5,
     products: 100,
     imagesPerProduct: 4,
+    variantsPerProduct: 30,
     subcategories: true,
     stats: 'basic',
     canVerify: true,
@@ -72,6 +77,7 @@ export const PLANS = {
     priceUsd: 15,
     products: Infinity,
     imagesPerProduct: 10,
+    variantsPerProduct: Infinity,
     subcategories: true,
     stats: 'detailed',
     canVerify: true,

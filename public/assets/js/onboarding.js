@@ -133,7 +133,8 @@ $('#slug').addEventListener('input', () => { slugEdited = true; checkSlug(); });
  * أثر ما فعله للتو وتُشعره بأنه بدأ من الصفر.
  */
 {
-  const wanted = new URLSearchParams(location.search).get('store')?.trim().slice(0, 40);
+  const q = new URLSearchParams(location.search);
+  const wanted = q.get('store')?.trim().slice(0, 40);
   if (wanted) {
     data.name = wanted;
     $('#name').value = wanted;
@@ -335,3 +336,16 @@ $('#copyUrl').addEventListener('click', async (e) => {
     goto('s3');
   } catch { /* زائر جديد */ }
 })();
+
+/**
+ * اللون القادم من استوديو الصفحة الرئيسية.
+ * الزائر اختاره ورأى متجره مصبوغاً به قبل أن يضغط «أنشئ»؛
+ * إسقاطه هنا يكسر الوعد الذي قطعته تلك الصفحة.
+ * يُطبَّق في نهاية الملف لأن setColor وHEX6 يُعرَّفان بعد كتلة
+ * قراءة المعاملات أعلاه.
+ */
+{
+  const q = new URLSearchParams(location.search);
+  const color = q.get('color');
+  if (color && HEX6.test(color)) setColor(color, q.get('deep') ?? '');
+}
