@@ -1,7 +1,7 @@
 # تفعيل التحقق برقم الجوال
 
 المنصة تدعم ثلاثة مزوّدات، يُختار بينها بمتغيّر بيئة واحد `OTP_PROVIDER`.
-**لا يتغيّر أي كود** عند التبديل — نقطة التبديل كلها في [`src/notify.js`](src/notify.js).
+**لا يتغيّر أي كود** عند التبديل — نقطة التبديل كلها في [`server/notify.js`](../server/notify.js).
 
 ```bash
 OTP_PROVIDER=console    # الافتراضي — للتطوير
@@ -148,7 +148,7 @@ npm start        # OTP_PROVIDER=console افتراضياً
 ## اختبار سريع
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/request-code \
+curl -X POST http://localhost:3100/api/auth/request-code \
   -H "content-type: application/json" \
   -d '{"phone":"777123456"}'
 ```

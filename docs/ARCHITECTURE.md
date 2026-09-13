@@ -9,7 +9,7 @@
 
 | البند | المرجع | التنفيذ |
 |---|---|---|
-| تجزئة رمز التحقق | §٢.١ | HMAC-SHA256 بفلفل من البيئة — [`src/auth.js`](src/auth.js) `hashCode()` |
+| تجزئة رمز التحقق | §٢.١ | HMAC-SHA256 بفلفل من البيئة — [`server/auth.js`](../server/auth.js) `hashCode()` |
 | منع تعداد الأرقام | §٢.٣ | الرد لا يحمل `returning` إطلاقاً |
 | رسالة فشل موحّدة | §٢.٤ | كل حالات فشل التحقق تعيد النص نفسه + `timingSafeEqual` |
 | استهلاك الرمز | §٢.٤ | يُحذف فور نجاح التحقق، فلا يُعاد استخدامه |
@@ -23,7 +23,7 @@
 | طابور مراجعة المدفوعات | §٥.٦ | `/api/admin/invoices` بالصورة والمرجع والمبلغ |
 | الأسعار في قاعدة البيانات | §٥.٦ · §١١ | `platform_settings` — يضبطها الفريق بلا إعادة نشر |
 | سجل تدقيق | §٤-٤ | `audit_log`: من فعل ماذا ومتى ولماذا |
-| SSR + Open Graph | §٦.١ | [`src/render.js`](src/render.js) — معاينة واتساب تعمل |
+| SSR + Open Graph | §٦.١ | [`server/render.js`](../server/render.js) — معاينة واتساب تعمل |
 | حجز المخزون وقت الطلب | — | معاملة `BEGIN IMMEDIATE` تمنع البيع المزدوج |
 | زوّار فريدون | — | بصمة مجزّأة تُحذف بعد يومين، بلا تخزين IP |
 
@@ -35,7 +35,7 @@
 
 **تُبرّر المواصفة Next.js بثلاثة أسباب:** SEO، ومعاينة روابط واتساب، وحمولة خفيفة.
 
-**الثلاثة محقَّقة فعلاً في البناء الحالي**، ومُختبَرة في [`test/pages.mjs`](test/pages.mjs):
+**الثلاثة محقَّقة فعلاً في البناء الحالي**، ومُختبَرة في [`test/pages.mjs`](../test/pages.mjs):
 عنوان الصفحة واسم المتجر ووصفه وصورته و٩ منتجات كلها في HTML **قبل تنفيذ أي JavaScript**،
 مع `og:*` و`application/ld+json`.
 
@@ -55,7 +55,7 @@ create policy tenant_isolation on products
   using (store_id = current_setting('app.store_id')::uuid);
 ```
 
-SQLite لا تملك هذا. البديل المبني — [`src/tenancy.js`](src/tenancy.js) — يفرض المكافئ
+SQLite لا تملك هذا. البديل المبني — [`server/tenancy.js`](../server/tenancy.js) — يفرض المكافئ
 بنيوياً: لا يمكن الحصول على مقبض استعلام لجدول تابع دون `store_id`، والـSQL الحر يُرفض
 إن لم يذكره، و`verifyIsolation()` يفحص عند الإقلاع.
 
@@ -63,7 +63,7 @@ SQLite لا تملك هذا. البديل المبني — [`src/tenancy.js`](sr
 
 > **متى ننتقل إلى PostgreSQL:** عند أول واحدة من هذه — تعدّد خوادم التطبيق ·
 > كتابات متزامنة تتجاوز ما يحتمله كاتب SQLite الواحد · انضمام مطوّر ثانٍ للفريق.
-> DDL الخاص بـRLS جاهز في [`ops/postgres-rls.sql`](ops/postgres-rls.sql).
+> DDL الخاص بـRLS جاهز في [`ops/postgres-rls.sql`](../ops/postgres-rls.sql).
 
 ### §٦.٢ — التخزين: R2 قرار صحيح، والتنفيذ مؤجَّل
 
@@ -72,7 +72,7 @@ SQLite لا تملك هذا. البديل المبني — [`src/tenancy.js`](sr
 
 الصور اليوم على القرص المحلي بمسارات `uploads/stores/{id}/{kind}/{hash}.ext` —
 **وهي نفس بنية المفاتيح التي ستأخذها على R2**. الانتقال تغيير
-[`src/uploads.js`](src/uploads.js) وحده.
+[`server/uploads.js`](../server/uploads.js) وحده.
 
 > **متى:** عند أول خادم إنتاج حقيقي. قبله، القرص المحلي أبسط ولا يكلّف شيئاً.
 
@@ -99,7 +99,7 @@ SQLite لا تملك هذا. البديل المبني — [`src/tenancy.js`](sr
 المواصفة تنبّه بحق: اعتماد Meta Business وقالب المصادقة **يستغرق أياماً**،
 وقد يعطّل الإطلاق إن بدأ متأخراً.
 
-الكود جاهز لاستقباله: [`src/notify.js`](src/notify.js) ينتظر `WHATSAPP_TOKEN`
+الكود جاهز لاستقباله: [`server/notify.js`](../server/notify.js) ينتظر `WHATSAPP_TOKEN`
 و`WHATSAPP_PHONE_ID` فقط، والخطوات في [`SETUP-OTP.md`](SETUP-OTP.md).
 **ابدأ التوثيق الآن بالتوازي** — لا شيء في الكود يعطّله.
 

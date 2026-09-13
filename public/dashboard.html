@@ -38,7 +38,17 @@
       <button data-v="cats">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>التصنيفات
       </button>
+      <button data-v="customers">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg>العملاء
+      </button>
+      <button data-v="reviews">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z"/></svg>التقييمات
+        <span class="pill" id="revPill" hidden>0</span>
+      </button>
       <small>الإعدادات</small>
+      <button data-v="delivery">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 13a8 8 0 0 1 16 0"/><rect x="1" y="13" width="6" height="7" rx="2"/><rect x="17" y="13" width="6" height="7" rx="2"/></svg>التوصيل والدفع
+      </button>
       <button data-v="settings">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4Z"/></svg>إعدادات المتجر
       </button>
@@ -142,6 +152,73 @@
         </div>
       </section>
 
+      <!-- العملاء -->
+      <section class="view" id="v-customers">
+        <div class="card">
+          <div class="chead">
+            <h2>العملاء</h2>
+            <span class="badge b-done" id="custSum">—</span>
+          </div>
+          <table>
+            <thead><tr><th>العميل</th><th>الجوال</th><th>الطلبات</th><th>إجمالي المشتريات</th><th>آخر طلب</th></tr></thead>
+            <tbody id="custRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- التقييمات -->
+      <section class="view" id="v-reviews">
+        <div class="card">
+          <div class="chead">
+            <h2>تقييمات العملاء</h2>
+            <span class="badge b-done" id="revSum">—</span>
+          </div>
+          <p class="hint">
+            التقييمات تُنشر فور كتابتها. لا يمكنك تعديل رأي عميل ولا حذفه —
+            تُخفي المسيء وتردّ على الباقي، والردّ العلني أنفع لك من الإخفاء.
+          </p>
+          <div class="tabs" id="revTabs">
+            <button class="on" data-f="">الكل</button>
+            <button data-f="unanswered">بلا ردّ</button>
+            <button data-f="low">منخفضة</button>
+            <button data-f="hidden">المخفيّة</button>
+          </div>
+          <div id="revList"></div>
+        </div>
+      </section>
+
+      <!-- التوصيل والدفع -->
+      <section class="view" id="v-delivery">
+        <div class="grid2">
+          <div class="card">
+            <div class="chead">
+              <h2>مناطق التوصيل</h2>
+              <button class="btn btn-fill btn-sm" id="addZone">أضف منطقة</button>
+            </div>
+            <p class="hint" id="zoneHint"></p>
+            <table>
+              <thead><tr><th>المنطقة</th><th>الرسم</th><th>مجاني فوق</th><th></th></tr></thead>
+              <tbody id="zoneRows"></tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <div class="chead"><h2>طرق الدفع</h2></div>
+            <p class="hint">
+              المنصة لا تلمس أموال مبيعاتك ولا تضمنها. تأكيد الدفع قرارك وحدك.
+            </p>
+            <div id="payMethods" style="display:grid;gap:10px;margin:14px 0"></div>
+            <label class="field">
+              <span>تعليمات التحويل</span>
+              <textarea id="payNote" maxlength="400"
+                        placeholder="مثال: حوّل إلى محفظة الكريمي ٧٧٧١٢٣٤٥٦ باسم…، وأرفق صورة الإيصال."></textarea>
+              <small>تظهر للعميل بعد اختياره طريقة تحويل، وفي صفحة تأكيد الطلب.</small>
+            </label>
+            <button class="btn btn-fill" id="savePay">حفظ</button>
+          </div>
+        </div>
+      </section>
+
       <!-- الإعدادات -->
       <section class="view" id="v-settings">
         <div class="grid2">
@@ -177,7 +254,7 @@
             </div>
 
             <div class="card" style="margin-top:18px">
-              <div class="chead"><h2>الهوية اللونية</h2><span id="tierBadge"></span></div>
+              <div class="chead"><h2>هوية المتجر</h2><span id="tierBadge"></span></div>
               <div class="body">
                 <label class="field">
                   <span>اللون الأساسي</span>
@@ -196,6 +273,11 @@
                   <span>سكِن الواجهة</span>
                   <div class="skins" id="skins"></div>
                   <small id="skinHint"></small>
+                </div>
+                <div class="field" id="layoutField">
+                  <span>قالب الواجهة</span>
+                  <div class="layouts" id="layouts"></div>
+                  <small id="layoutHint"></small>
                 </div>
               </div>
             </div>
@@ -236,6 +318,13 @@
             <div class="card" style="margin-top:18px">
               <div class="chead"><h2>التواصل والاستلام</h2></div>
               <div class="body">
+                <!-- الدولة قبل الرقم: منها تُشتقّ العملة وبها يُفهم
+                     رقم واتساب المحلي — تُملأ خياراتها من countries.js -->
+                <label class="field">
+                  <span>الدولة</span>
+                  <select id="setCountry"></select>
+                  <small>تحدّد عملة الأسعار وصيغة أرقام الجوال في متجرك.</small>
+                </label>
                 <label class="field"><span>رقم واتساب المتجر</span><input type="tel" id="setWa" dir="ltr"></label>
                 <label class="field"><span>المدينة</span><input type="text" id="setCity"></label>
                 <label class="field"><span>العنوان</span><input type="text" id="setAddress"></label>
@@ -247,12 +336,12 @@
               <div class="chead"><h2>التوصيل</h2></div>
               <div class="body">
                 <label class="field">
-                  <span>رسوم التوصيل (ر.ي)</span>
+                  <span>رسوم التوصيل (<i class="cur-lbl"></i>)</span>
                   <input type="number" id="setDelFee" min="0" inputmode="numeric" placeholder="0">
                   <small>اتركها صفراً إن كان التوصيل مجانياً أو يُتفق عليه مع كل عميل.</small>
                 </label>
                 <label class="field">
-                  <span>توصيل مجاني فوق (ر.ي)</span>
+                  <span>توصيل مجاني فوق (<i class="cur-lbl"></i>)</span>
                   <input type="number" id="setDelFree" min="0" inputmode="numeric" placeholder="0">
                   <small>صفر يعني لا يوجد حد للتوصيل المجاني.</small>
                 </label>
@@ -320,7 +409,7 @@
   <label class="field"><span>اسم المنتج</span><input type="text" id="fName"></label>
   <label class="field"><span>التصنيف</span><select id="fCat"></select></label>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-    <label class="field"><span>السعر (ر.ي)</span><input type="number" id="fPrice" min="0" inputmode="numeric"></label>
+    <label class="field"><span>السعر (<i class="cur-lbl"></i>)</span><input type="number" id="fPrice" min="0" inputmode="numeric"></label>
     <label class="field"><span>السعر قبل الخصم</span><input type="number" id="fOld" min="0" inputmode="numeric" placeholder="اختياري"></label>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">

@@ -7,7 +7,12 @@
 
 :root{
   /* الهوية */
-  --cream:#FAF3E8;  --paper:#FFFCF6;  --sand:#EFE3CC;  --line:#DFD1B5;
+  /* أسطح بيضاء لا عاجيّة. «الورق» صار أخفض من الأرضية لا أعلى
+     منها، إذ لا شيء أفتح من الأبيض الخالص. وتبقى صفحات المنصة
+     هنا متطابقة مع الواجهة الجديدة كي لا يرى الزائر لونين حين
+     ينتقل من الرئيسية إلى /onboarding. ولا يمسّ هذا متاجر
+     التجّار: لوحاتها تُشتقّ في theme-core لا من هنا. */
+  --cream:#FFFFFF;  --paper:#F8F7F4;  --sand:#EFEDE7;  --line:#DCD8CF;
   /* --brass-deep و--ok مضبوطان على ٤٫٥:١ كحدّ أدنى فوق الورق
      والكريمي وحجاب المتجر. القيم السابقة (#93712F و#2E8B57) كانت
      ترسب بين ٣٫٩٧ و٤٫١٥ في عشرة مواضع نصّ صغير. */
@@ -23,7 +28,7 @@
 
   /* أسطح مشتقة من لون المتجر (theme-core.js) — القيم هنا
      مجرد سقوط آمن قبل أن يحقن الخادم أو JS لوحة التاجر */
-  --shop-veil:#F7EFE4;  --shop-edge:#E3D2B8;
+  --shop-veil:#FBF1F0;  --shop-edge:#E6CFCD;
   --glow:rgba(158,34,38,.16);  --glow-soft:rgba(158,34,38,.07);
 
   --display:'Markazi Text',serif;
@@ -138,6 +143,9 @@ textarea{resize:vertical;min-height:88px;line-height:1.7}
 .wrap{width:min(1200px,92vw);margin-inline:auto}
 .money{font-family:var(--display);font-weight:700;white-space:nowrap}
 .cur{font-size:.72em;color:var(--soft);font-weight:500;font-family:var(--body)}
+/* رمز العملة داخل عناوين الحقول — تملؤه JS من عملة المتجر،
+   فلا يكتب تاجر أردني سعره في حقل مكتوب عليه «ر.ي» */
+.cur-lbl{font-style:normal}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .spin{width:17px;height:17px;border:2px solid rgba(250,243,232,.35);border-top-color:currentColor;
   border-radius:50%;animation:spin .7s linear infinite}

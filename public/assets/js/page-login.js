@@ -1,14 +1,26 @@
 // سكربت صفحة /login — أُخرج من HTML ليعمل مع CSP الصارم
 import { $, $$, api, toast, withBusy } from '/assets/js/app.js';
+import { COUNTRIES, DEFAULT_COUNTRY } from '/assets/js/countries.js';
 
 let phone = '';
 const show = (id) => $$('.step').forEach((s) => s.classList.toggle('on', s.id === id));
 
+/**
+ * منتقي الدولة — كان `+967` مكتوباً في HTML، فلم يكن لتاجر من
+ * خارج اليمن أي طريق للدخول أصلاً. الخيار يُرسل مع الرقم فيفهم
+ * الخادم `790123456` أردنياً لا يمنياً.
+ */
+const country = $('#country');
+country.innerHTML = Object.values(COUNTRIES)
+  .map((c) => `<option value="${c.code}">+${c.dial}</option>`).join('');
+country.value = DEFAULT_COUNTRY;
+
 $('#sendCode').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
   $('#phoneErr').hidden = true;
-  const res = await api.post('/api/auth/request-code', { phone: $('#phone').value });
+  const res = await api.post('/api/auth/request-code',
+    { phone: $('#phone').value, country: country.value });
   phone = res.phone;
-  $('#phoneEcho').textContent = '+967 ' + res.phone;
+  $('#phoneEcho').textContent = '+' + res.phone;
   if (res.devCode) { $('#devHint').hidden = false; $('#devHint').textContent = `وضع التطوير — الرمز: ${res.devCode}`; }
   show('s2');
   $('#otp').firstElementChild.focus();

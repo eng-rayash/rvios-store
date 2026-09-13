@@ -50,17 +50,22 @@ jobs:
       - name: تثبيت الاعتماديات
         run: npm ci --no-audit --no-fund
 
-      - name: شجرة الاعتماديات تبقى ضحلة
-        run: |
-          npm ls --all
-          # حزمة واحدة بلا متعدّيات — أي نموّ هنا قرار لا مفاجأة
-          test "$(npm ls --all --parseable | wc -l)" -le 2
+      # كان هنا عدٌّ لشجرة الاعتماديات (حزمة واحدة). بعد دمج
+      # ‏Next في الحزمة نفسها فقد العدّ معناه — لا السببَ خلفه.
+      # فصار الفحص يقيس ما يستورده الخادم فعلاً، وهو أدقّ:
+      # يقيس الاستعمال لا التثبيت.
+      - name: الخادم يبقى على اعتمادية واحدة
+        run: npm run check:server-deps
+
+      # أنواع Next والمكوّنات — بلا قاعدة ولا خادم
+      - name: فحص الأنواع
+        run: npm run typecheck
 
       - name: تطبيق المخطّط
         run: npm run migrate
 
       - name: التحقق من العزل بين المتاجر
-        run: node --no-warnings -e "import('./src/tenancy.js').then(m => m.verifyIsolation()).then(() => import('./src/pg.js')).then(m => m.db.close())"
+        run: node --no-warnings -e "import('./server/tenancy.js').then(m => m.verifyIsolation()).then(() => import('./server/pg.js')).then(m => m.db.close())"
 
       - name: تدقيق الجاهزية
         run: npm run readiness
@@ -73,26 +78,18 @@ jobs:
 
       - name: تشغيل الخادم
         run: |
-          node --no-warnings src/server.js &
+          node --no-warnings server/server.js &
           echo $! > server.pid
           for i in $(seq 1 30); do
             curl -sf http://localhost:3000/health && break
             sleep 1
           done
 
+      # القائمة تعيش في test/run.mjs وحده. كانت مكتوبة هنا وفي
+      # package.json فتباعدتا: ثلاث مجموعات (variants · entry ·
+      # countries) كانت تعمل محلياً ولا تعمل في CI إطلاقاً.
       - name: الاختبارات
-        run: |
-          node --no-warnings test/smoke.mjs
-          node --no-warnings test/images.mjs
-          node --no-warnings test/gallery.mjs
-          node --no-warnings test/billing.mjs
-          node --no-warnings test/stores.mjs
-          node --no-warnings test/pages.mjs
-          node --no-warnings test/webhook.mjs
-          node --no-warnings test/infra.mjs
-          node --no-warnings test/reminders.mjs
-          node --no-warnings test/pwa.mjs
-          node --no-warnings test/pagination.mjs
+        run: npm run test:suites
 
       - name: الإيقاف الرشيد يعمل
         run: |

@@ -3,7 +3,8 @@
 //  البحث والفلترة والترقيم كلها في الخادم (§٥.٣): لا نُنزل
 //  كتالوجاً كاملاً على إنترنت بطيء.
 // ═══════════════════════════════════════════════════════════
-import { $, $$, api, AR, money, escapeHtml, toast, withBusy, trapFocus, applyTheme, tierOf, store as ls, when } from './app.js';
+import { $, $$, api, AR, money, currency, setCurrency, escapeHtml, toast, withBusy, trapFocus, applyTheme, tierOf, store as ls, when } from './app.js';
+import { labelOf } from './sectors.js';
 
 const SLUG = decodeURIComponent(location.pathname.split('/').filter(Boolean)[0] ?? '');
 const CART_KEY = `rvios.cart.${SLUG}`;
@@ -38,6 +39,8 @@ async function init() {
   }
 
   SHOP = data.store;
+  // قبل أي رسم: بطاقة رُسمت بالعملة الافتراضية لا تُعاد
+  setCurrency(SHOP.currency);
   DELIVERY = data.delivery ?? DELIVERY;
   CATS = data.categories;
   absorb(data);
@@ -68,12 +71,6 @@ function absorb(data) {
   PAGE = data.page; PAGES = data.pages; TOTAL = data.total;
 }
 
-const SECTORS = {
-  perfumes: 'عطور وبخور', fashion: 'أزياء وملابس', beauty: 'تجميل وعناية',
-  food: 'أطعمة وحلويات', electronics: 'إلكترونيات', home: 'مستلزمات منزل',
-  accessories: 'إكسسوارات', kids: 'أطفال',
-};
-
 function paintIdentity() {
   document.title = `${SHOP.name} — RVIOS Store`;
   $('#shopName').textContent = SHOP.name;
@@ -87,7 +84,7 @@ function paintIdentity() {
   // §٢.١ — برو يخفي شريط المنصة العلوي ويبقي سطر التذييل
   $('#plat').hidden = SHOP.plan === 'pro';
 
-  const kicker = SECTORS[SHOP.sector] || (SHOP.city ? `متجر في ${SHOP.city}` : '');
+  const kicker = labelOf(SHOP.sector) || (SHOP.city ? `متجر في ${SHOP.city}` : '');
   if (kicker) { $('#heroKicker').textContent = kicker; $('#heroKicker').hidden = false; }
 
   $('#logo').innerHTML = SHOP.logo
@@ -101,10 +98,11 @@ function paintIdentity() {
   if (SHOP.verified) meta.push('✓ متجر موثّق');
   if (SHOP.city) meta.push(SHOP.city);
   if (DELIVERY.fee === 0) meta.push('توصيل مجاني');
-  else if (DELIVERY.freeOver) meta.push(`توصيل مجاني فوق ${AR(DELIVERY.freeOver)} ر.ي`);
+  else if (DELIVERY.freeOver) meta.push(`توصيل مجاني فوق ${AR(DELIVERY.freeOver)} ${currency()}`);
   $('#heroMeta').innerHTML = meta.map((m) => `<span>${escapeHtml(m)}</span>`).join('');
 
-  const wa = `https://wa.me/967${SHOP.whatsapp}`;
+  // الرقم مخزَّن E.164 فلا يُسبق برمز دولة ثانٍ
+  const wa = `https://wa.me/${SHOP.whatsapp}`;
   $('#waDirect').href = wa;
   $('#fWa').href = wa;
   $('#heroWa').href = wa;
@@ -172,8 +170,8 @@ function paintTrust() {
   const cells = [
     DELIVERY.fee === 0
       ? cell('truck', 'توصيل مجاني', DELIVERY.note || 'يُتفق عليه مع التاجر')
-      : cell('truck', `التوصيل ${AR(DELIVERY.fee)} ر.ي`,
-             DELIVERY.freeOver ? `مجاني فوق ${AR(DELIVERY.freeOver)} ر.ي` : (DELIVERY.note || 'داخل المدينة')),
+      : cell('truck', `التوصيل ${AR(DELIVERY.fee)} ${currency()}`,
+             DELIVERY.freeOver ? `مجاني فوق ${AR(DELIVERY.freeOver)} ${currency()}` : (DELIVERY.note || 'داخل المدينة')),
     cell('chat', 'الطلب عبر واتساب', 'تأكيد مباشر مع التاجر'),
     SHOP.verified
       ? cell('check', 'متجر موثّق', 'راجعت RVIOS هوية التاجر')
@@ -256,6 +254,43 @@ async function load(page = 1, append = false) {
   }
 }
 
+// ═══ التقييمات ═══════════════════════════════════════════
+
+/**
+ * نجومٌ من SVG لا من محارف «★».
+ *
+ * محرف النجمة يختلف شكله وعرضه بين الخطوط، ونصفُ نجمةٍ به
+ * مستحيل. والنجمة هنا رقمٌ يُقرأ بنظرة، فيجب أن يكون شكلها
+ * واحداً عند كل زائر.
+ */
+function starSvg(fill, id) {
+  const clip = `sc${id}`;
+  return `<svg viewBox="0 0 20 20" aria-hidden="true">
+    <defs><clipPath id="${clip}"><rect x="0" y="0" width="${(fill * 20).toFixed(2)}" height="20"/></clipPath></defs>
+    <path class="bg" d="M10 1.6l2.5 5.1 5.6.8-4 4 .9 5.6-5-2.7-5 2.7.9-5.6-4-4 5.6-.8z"/>
+    <path class="fg" clip-path="url(#${clip})" d="M10 1.6l2.5 5.1 5.6.8-4 4 .9 5.6-5-2.7-5 2.7.9-5.6-4-4 5.6-.8z"/>
+  </svg>`;
+}
+
+let starSeq = 0;
+function starRow(average, size = 'sm') {
+  const seq = ++starSeq;
+  // النجمة الجزئية هي ما يفرّق ٤٫٢ عن ٤٫٨ — التقريب لأقرب
+  // نجمة يجعل كل متجر فوق المتوسط يبدو متطابقاً مع غيره
+  const stars = Array.from({ length: 5 }, (_, i) =>
+    starSvg(Math.min(1, Math.max(0, average - i)), `${seq}-${i}`)).join('');
+  return `<span class="stars ${size}">${stars}</span>`;
+}
+
+function starsHtml(rating) {
+  const r = rating ?? { count: 0, average: 0 };
+  // لا نرسم صفر نجوم: صفٌّ رمادي فارغ يقرأه الزائر «رديء»
+  // بينما الحقيقة أنه «لم يقيّمه أحد بعد»
+  if (!r.count) return '<div class="rrow none">لا تقييمات بعد</div>';
+  return `<div class="rrow">${starRow(r.average)}<b>${r.average.toFixed(1)}</b>
+    <span>(${AR(r.count)})</span></div>`;
+}
+
 // ═══ عرض ═════════════════════════════════════════════════
 function cardHtml(p) {
   const catName = CATS.find((c) => c.id === p.categoryId)?.name;
@@ -277,9 +312,10 @@ function cardHtml(p) {
       <h3 data-open="${p.id}">${escapeHtml(p.name)}</h3>
       <div class="sub">${escapeHtml(p.summary || '')}${p.summary && p.variant ? '<span class="dot"></span>' : ''}${escapeHtml(p.variant || '')}</div>
       <div class="prow">
-        <span class="p">${AR(p.price)}</span><span class="cur">ر.ي</span>
+        <span class="p">${AR(p.price)}</span><span class="cur">${currency()}</span>
         ${p.oldPrice ? `<s>${AR(p.oldPrice)}</s>` : ''}
       </div>
+      ${starsHtml(p.rating)}
       <div class="stock ${p.stock === 'ok' ? '' : p.stock}"><i></i>${escapeHtml(p.stockLabel)}</div>
       <div class="buy">
         <button class="add" data-add="${p.id}" ${p.qty <= 0 ? 'disabled' : ''}>
@@ -452,13 +488,13 @@ async function openProduct(id) {
     <div class="mi">
       <div class="k">${escapeHtml(catName)}</div>
       <h2 id="mTitle">${escapeHtml(p.name)}</h2>
-      <div class="mp">${AR(p.price)} <em>ر.ي</em>${p.oldPrice ? ` <s style="font-size:16px;color:var(--soft);font-family:var(--body);font-weight:400">${AR(p.oldPrice)}</s>` : ''}</div>
+      <div class="mp">${AR(p.price)} <em>${currency()}</em>${p.oldPrice ? ` <s style="font-size:16px;color:var(--soft);font-family:var(--body);font-weight:400">${AR(p.oldPrice)}</s>` : ''}</div>
       <p>${escapeHtml(p.description || p.summary || '')}</p>
       <div class="spec">
         ${p.variant ? `<div><span>الحجم</span><b>${escapeHtml(p.variant)}</b></div>` : ''}
         ${p.summary ? `<div><span>الوصف</span><b>${escapeHtml(p.summary)}</b></div>` : ''}
         <div><span>التوفر</span><b style="color:${p.stock === 'ok' ? 'var(--ok)' : p.stock === 'low' ? 'var(--brass-deep)' : 'var(--soft)'}">${escapeHtml(p.stockLabel)}</b></div>
-        ${DELIVERY.fee ? `<div><span>التوصيل</span><b>${AR(DELIVERY.fee)} ر.ي${DELIVERY.freeOver ? ` · مجاني فوق ${AR(DELIVERY.freeOver)}` : ''}</b></div>`
+        ${DELIVERY.fee ? `<div><span>التوصيل</span><b>${AR(DELIVERY.fee)} ${currency()}${DELIVERY.freeOver ? ` · مجاني فوق ${AR(DELIVERY.freeOver)}` : ''}</b></div>`
                        : '<div><span>التوصيل</span><b style="color:var(--ok)">مجاني</b></div>'}
       </div>
       ${p.hasVariants ? variantPicker(p) : ''}
@@ -469,12 +505,142 @@ async function openProduct(id) {
         </a>
         <button class="btn btn-line btn-sm" id="copyP">نسخ الرابط</button>
       </div>
+      <div id="revBox"></div>
     </div>`;
 
   if (!PRODUCTS.find((x) => x.id === id)) PRODUCTS.push(p);
   if (p.hasVariants) bindPicker(p);
   history.replaceState(null, '', `?p=${p.id}`);
   show($('#modal'));
+  // التقييمات بعد فتح النافذة لا قبلها: العميل يرى المنتج فوراً
+  // ولا ينتظر رحلةَ شبكةٍ ثانية قبل أن يظهر له شيء
+  loadReviews(p.id);
+}
+
+// ═══ تقييمات المنتج داخل النافذة ═════════════════════════
+async function loadReviews(pid) {
+  const box = $('#revBox');
+  if (!box) return;
+  box.innerHTML = '<div class="rev-load">…</div>';
+  try {
+    const d = await api.get(`/api/shop/${encodeURIComponent(SLUG)}/products/${pid}/reviews`);
+    box.innerHTML = reviewsHtml(pid, d);
+    bindReviewForm(pid);
+  } catch {
+    // فشل التقييمات لا يجب أن يُفسد صفحة منتج تعمل
+    box.innerHTML = '';
+  }
+}
+
+function reviewsHtml(pid, d) {
+  const { summary: s, histogram: h, reviews } = d;
+  const max = Math.max(1, ...Object.values(h));
+
+  const bars = [5, 4, 3, 2, 1].map((n) => `
+    <div class="hbar"><span>${AR(n)}</span>
+      <i><b style="width:${((h[n] / max) * 100).toFixed(0)}%"></b></i>
+      <em>${AR(h[n])}</em></div>`).join('');
+
+  return `<section class="revs">
+    <h3>آراء العملاء</h3>
+    ${s.count ? `
+      <div class="rsum">
+        <div class="ravg">
+          <strong>${s.average.toFixed(1)}</strong>
+          ${starRow(s.average, 'lg')}
+          <span>${AR(s.count)} تقييم</span>
+        </div>
+        <div class="rhist">${bars}</div>
+      </div>` : '<p class="rempty">لا تقييمات بعد — كن أول من يشارك رأيه.</p>'}
+
+    <div class="rlist">${reviews.map(reviewCard).join('')}</div>
+
+    <details class="rform">
+      <summary>اكتب تقييمك</summary>
+      <form id="revForm" novalidate>
+        <div class="rpick" role="radiogroup" aria-label="التقييم">
+          ${[1, 2, 3, 4, 5].map((n) => `
+            <button type="button" data-star="${n}" role="radio" aria-checked="false"
+                    aria-label="${AR(n)} من ٥">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M10 1.6l2.5 5.1 5.6.8-4 4 .9 5.6-5-2.7-5 2.7.9-5.6-4-4 5.6-.8z"/>
+              </svg>
+            </button>`).join('')}
+        </div>
+        <input type="hidden" name="rating" value="0">
+        <input class="input" name="name" placeholder="اسمك (اختياري)" maxlength="40">
+        <textarea class="input" name="body" rows="3" maxlength="600"
+                  placeholder="ما رأيك في المنتج؟"></textarea>
+        <input class="input" name="phone" inputmode="tel" maxlength="24"
+               placeholder="رقم جوالك (اختياري — يمنحك شارة «مشترٍ موثَّق»)">
+        <button class="btn btn-solid" type="submit">أرسل التقييم</button>
+      </form>
+    </details>
+  </section>`;
+}
+
+function reviewCard(r) {
+  const when = new Date(r.createdAt).toLocaleDateString('ar-EG',
+    { year: 'numeric', month: 'long', day: 'numeric' });
+  return `<article class="rev">
+    <header>
+      ${starRow(r.rating)}
+      <b>${escapeHtml(r.name)}</b>
+      ${r.verified ? '<span class="vbadge">✓ مشترٍ موثَّق</span>' : ''}
+      <time>${when}</time>
+    </header>
+    ${r.body ? `<p>${escapeHtml(r.body)}</p>` : ''}
+    ${r.reply ? `<div class="rreply"><b>ردّ المتجر</b><p>${escapeHtml(r.reply)}</p></div>` : ''}
+  </article>`;
+}
+
+function bindReviewForm(pid) {
+  const form = $('#revForm');
+  if (!form) return;
+
+  const hidden = form.querySelector('[name=rating]');
+  // الامتلاء بالصنف لا بقصّ SVG: أزرار الاختيار كلٌّ منها
+  // ممتلئ أو فارغ، ولا حاجة لنصف نجمة هنا
+  const paint = (n) => {
+    form.querySelectorAll('[data-star]').forEach((b) => {
+      const v = Number(b.dataset.star);
+      b.classList.toggle('on', v <= n);
+      b.setAttribute('aria-checked', String(v === n));
+    });
+  };
+
+  form.querySelectorAll('[data-star]').forEach((b) => {
+    b.addEventListener('click', () => { hidden.value = b.dataset.star; paint(Number(b.dataset.star)); });
+    // المرور بالفأرة يُظهر ما ستختاره قبل أن تضغط
+    b.addEventListener('mouseenter', () => paint(Number(b.dataset.star)));
+  });
+  form.querySelector('.rpick')?.addEventListener('mouseleave',
+    () => paint(Number(hidden.value) || 0));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const rating = Number(fd.get('rating'));
+    if (!rating) return toast('اختر عدد النجوم أولاً', 'bad');
+
+    const btn = form.querySelector('[type=submit]');
+    btn.disabled = true;
+    try {
+      await api.post(`/api/shop/${encodeURIComponent(SLUG)}/products/${pid}/reviews`, {
+        rating,
+        name: fd.get('name'),
+        body: fd.get('body'),
+        phone: fd.get('phone'),
+      });
+      toast('شكراً لك — نُشر تقييمك');
+      await loadReviews(pid);
+      // البطاقة في الشبكة تحمل المتوسط القديم، فتُحدَّث معها
+      load(1);
+    } catch (err) {
+      toast(err.message, 'bad');
+      btn.disabled = false;
+    }
+  });
 }
 
 // ═══ منتقي الخيارات ══════════════════════════════════════
@@ -546,7 +712,7 @@ function bindPicker(p) {
     }
 
     // السعر قد يختلف بين الخيارات، فيتحدّث العنوان مع الاختيار
-    $('#mg .mp').innerHTML = `${AR(v.price)} <em>ر.ي</em>`;
+    $('#mg .mp').innerHTML = `${AR(v.price)} <em>${currency()}</em>`;
     $('#vState').textContent = v.qty <= 5
       ? `بقي ${AR(v.qty)} فقط من هذا الخيار`
       : 'متوفر';

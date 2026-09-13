@@ -22,7 +22,7 @@ EnvironmentFile=/srv/rvios/.env
 Environment=NODE_ENV=production
 Environment=LOG_JSON=1
 
-ExecStart=/usr/bin/node --no-warnings src/server.js
+ExecStart=/usr/bin/npm start
 
 # SIGTERM يفعّل الإيقاف الرشيد: يتوقّف القبول، تنتهي الطلبات
 # الجارية، تُؤخذ نسخة أخيرة، ثم تُغلق القاعدة.

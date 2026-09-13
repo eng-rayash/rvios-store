@@ -10,12 +10,14 @@ import { config } from '../config.js';
 const VISIT_SALT = config.visitSalt;
 import { scope } from '../tenancy.js';
 import { json, readBody, bad, notFound, clean, toInt, rateLimit, clientIp } from '../http.js';
-import { placeOrder, withItems, waLink, waAsk, deliveryFor } from '../orders.js';
+import { placeOrder, withItems, waLink, waAsk, deliveryFor, PAY_METHODS } from '../orders.js';
 import { publicStore } from './merchant.js';
 import { notifyNewOrder } from '../notify.js';
-import { galleryOf } from '../uploads.js';
+import { galleryOf, saveImage } from '../uploads.js';
 import { planOf } from '../plans.js';
 import { variantsOf, publicVariant, axesOf } from '../variants.js';
+import { toE164, symbolOf } from '../countries.js';
+import { summaryFor, summaryOf, histogramOf, listPublic, addReview } from '../reviews.js';
 
 /** يجلب متجراً نشطاً بالرابط، أو يرمي ٤٠٤ */
 export async function storeBySlug(slug) {
@@ -27,7 +29,7 @@ export async function storeBySlug(slug) {
   return s;
 }
 
-async function shape(store, p, { gallery = false } = {}) {
+async function shape(store, p, { gallery = false, rating = null } = {}) {
   // الخيارات تُجلب مع صفحة المنتج فقط: شبكة المنتجات لا تعرض
   // مقاسات، وجلبها لكل بطاقة يعني استعلاماً لكل صفّ.
   const variants = gallery && p.has_variants
@@ -45,7 +47,10 @@ async function shape(store, p, { gallery = false } = {}) {
     } : {}),
     // المعرض يُجلب عند الحاجة فقط — الشبكة تكتفي بالغلاف
     ...(gallery ? { images: await galleryOf(scope(store.id), p) } : {}),
-    // §٣.٤ — مؤشر توفّر صادق بدل نجوم تقييم غير حقيقية
+    // §٣.٤ رفضت «نجوم تقييم غير حقيقية»، والمؤشر الصادق يبقى.
+    // النجوم هنا لا تنقض ذلك: يكتبها بشر، ورقمها صفر حتى
+    // يكتب أولُهم — لا يُصطنع متوسطٌ لمنتج لم يقيّمه أحد.
+    rating: rating ?? { count: 0, average: 0 },
     stock: p.qty <= 0 ? 'none' : p.qty <= 5 ? 'low' : 'ok',
     stockLabel: p.qty <= 0 ? 'نفد المخزون'
       : p.qty <= 5 ? `بقي ${p.qty.toLocaleString('ar-EG')} فقط`
@@ -112,8 +117,12 @@ async function queryProducts(store, query) {
     [...params, per, (page - 1) * per],
   );
 
+  // ملخّص التقييمات لكل الصفحة باستعلام واحد — لا استعلام
+  // لكل بطاقة: شبكة من ٤٨ منتجاً كانت ستكلّف ٤٨ رحلة للقاعدة
+  const ratings = await summaryFor(store.id, rows.map((p) => p.id));
+
   return {
-    products: await Promise.all(rows.map((p) => shape(store, p))),
+    products: await Promise.all(rows.map((p) => shape(store, p, { rating: ratings.get(p.id) }))),
     total,
     page,
     per,
@@ -136,12 +145,24 @@ export default async function register(r) {
       cats.map(async (c) => [c.id, await s.count('products', { category_id: c.id, live: 1 })]),
     ));
 
+    const zones = await s.all('delivery_zones', {}, { order: 'sort, id' });
+
     json(res, {
       store: publicStore(store),
       delivery: {
+        // الرسم العام يبقى: متجر لم يُعرّف مناطق يعمل كما كان
         fee: store.delivery_fee ?? 0,
         freeOver: store.delivery_free_over ?? 0,
         note: store.delivery_note ?? '',
+        zones: zones.map((z) => ({
+          id: z.id, name: z.name, fee: z.fee, freeOver: z.free_over,
+        })),
+      },
+      payment: {
+        methods: String(store.pay_methods || 'cod').split(',')
+          .map((m) => m.trim()).filter((m) => PAY_METHODS[m])
+          .map((m) => ({ ...PAY_METHODS[m] })),
+        note: store.pay_note ?? '',
       },
       categories: cats.map((c) => ({ id: c.id, name: c.name, parentId: c.parent_id, count: counts[c.id] ?? 0 })),
       ...await queryProducts(store, req.query),
@@ -159,7 +180,59 @@ export default async function register(r) {
     const store = await storeBySlug(req.params.slug);
     const p = await scope(store.id).get('products', { id: toInt(req.params.id), live: 1 });
     if (!p) notFound('المنتج غير موجود');
-    json(res, { store: publicStore(store), product: await shape(store, p, { gallery: true }) });
+    const rating = await summaryOf(store.id, p.id);
+    json(res, {
+      store: publicStore(store),
+      product: await shape(store, p, { gallery: true, rating }),
+      reviews: await listPublic(store.id, p.id, { limit: 20 }),
+      histogram: await histogramOf(store.id, p.id),
+    });
+  });
+
+  // ── تقييمات منتج: قراءة ───────────────────────────────
+  r.get('/api/shop/:slug/products/:id/reviews', async (req, res) => {
+    const store = await storeBySlug(req.params.slug);
+    const id = toInt(req.params.id);
+    const p = await scope(store.id).get('products', { id, live: 1 });
+    if (!p) notFound('المنتج غير موجود');
+
+    const per = Math.min(50, Math.max(1, toInt(req.query.get('per'), 20)));
+    const page = Math.max(1, toInt(req.query.get('page'), 1));
+    json(res, {
+      summary: await summaryOf(store.id, id),
+      histogram: await histogramOf(store.id, id),
+      reviews: await listPublic(store.id, id, {
+        sort: req.query.get('sort') ?? 'helpful',
+        limit: per,
+        offset: (page - 1) * per,
+      }),
+      page,
+      per,
+    });
+  });
+
+  // ── تقييمات منتج: كتابة ───────────────────────────────
+  //  مفتوح لأي زائر بقرار صريح. الحماية بالبصمة وحدّ المعدّل
+  //  لا بالتسجيل — واشتراط الحساب يقتل التقييمات من أساسها.
+  r.post('/api/shop/:slug/products/:id/reviews', async (req, res) => {
+    const store = await storeBySlug(req.params.slug);
+    // خمسة تقييمات في الساعة من عنوان واحد: يكفي زائراً صادقاً
+    // يقيّم ما اشتراه، ويقطع سيلاً آلياً قبل أن يبدأ
+    await rateLimit(`review:${clientIp(req)}`, { max: 5, windowMs: 3600_000 });
+
+    const body = await readBody(req);
+    const review = await addReview(store, toInt(req.params.id), {
+      rating: body.rating,
+      name: body.name,
+      body: body.body,
+      phone: body.phone,
+    }, req);
+
+    json(res, {
+      ok: true,
+      review: { id: review.id, rating: review.rating, verified: !!review.verified },
+      summary: await summaryOf(store.id, review.product_id),
+    }, 201);
   });
 
   // ── تسجيل زيارة (§١٠ — قياس) ──────────────────────────
@@ -191,11 +264,13 @@ export default async function register(r) {
 
     const body = await readBody(req);
     const order = await placeOrder(store.id, store, {
-      lines:   body.lines,
-      name:    clean(body.name, 60),
-      phone:   clean(body.phone, 20),
-      address: clean(body.address, 200),
-      note:    clean(body.note, 300),
+      lines:     body.lines,
+      name:      clean(body.name, 60),
+      phone:     clean(body.phone, 20),
+      address:   clean(body.address, 200),
+      note:      clean(body.note, 300),
+      zoneId:    toInt(body.zoneId),
+      payMethod: clean(body.payMethod, 12),
     });
 
     const full = await withItems(store.id, await scope(store.id).get('orders', { id: order.id }));
@@ -210,9 +285,38 @@ export default async function register(r) {
       subtotal: order.subtotal,
       delivery: order.delivery,
       total: order.total,
+      zone: order.zone,
+      payMethod: order.payMethod,
+      payStatus: order.payStatus,
+      // تعليمات التحويل تُرسل مع الرد لا في صفحة منفصلة: العميل
+      // في لحظة الدفع الآن، ونقلُه إلى مكان آخر يفقد نصفهم
+      payNote: order.payMethod === 'cod' ? '' : (store.pay_note ?? ''),
       wa: waLink(store, full),
       message: `سُجّل طلبك برقم ${order.ref}`,
     }, 201);
+  });
+
+  // ── رفع إيصال التحويل ─────────────────────────────────
+  //  العميل يرفع صورة التحويل بعد الطلب، فتنتقل الحالة إلى
+  //  «بانتظار مراجعتك» وتظهر للتاجر. المنصة **لا تتحقق** من
+  //  الإيصال ولا تضمنه — التأكيد قرار التاجر وحده.
+  r.post('/api/shop/:slug/orders/:ref/proof', async (req, res) => {
+    const store = await storeBySlug(req.params.slug);
+    await rateLimit(`proof:${clientIp(req)}:${store.id}`, { max: 10, windowMs: 30 * 60_000 });
+
+    const s = scope(store.id);
+    const order = await s.get('orders', { ref: clean(req.params.ref, 20) });
+    if (!order) notFound('الطلب غير موجود');
+
+    if (order.pay_method === 'cod') bad('هذا الطلب دفعه عند الاستلام');
+    if (order.pay_status === 'paid') bad('الطلب مؤكد الدفع مسبقاً');
+
+    const body = await readBody(req);
+    const url = await saveImage(store.id, 'proofs', body.image);
+    if (!url) bad('أرفق صورة الإيصال');
+
+    await s.update('orders', order.id, { pay_proof: url, pay_status: 'pending' });
+    json(res, { ok: true, message: 'وصل إيصالك — بانتظار تأكيد المتجر' });
   });
 
   // ── متابعة طلب برقمه المرجعي ──────────────────────────
@@ -252,8 +356,14 @@ export default async function register(r) {
     const body = await readBody(req);
     const kind = clean(body.kind, 20);
     if (!['build', 'domain', 'store', 'other'].includes(kind)) bad('نوع الطلب غير معروف');
-    const contact = clean(body.contact, 60);
-    if (!contact) bad('اترك رقم تواصل');
+    const typed = clean(body.contact, 60);
+    if (!typed) bad('اترك رقم تواصل');
+
+    // يُخزَّن دولياً موحّداً: لوحة الإدارة تفتحه بـ`wa.me` مباشرةً،
+    // ورقم محلي بلا رمز دولة يعطي رابطاً لا يفتح شيئاً — فيضيع
+    // طلب خدمة كامل بصمت. وما تعذّر توحيده يُحفظ كما كُتب حتى
+    // لا نرفض طلباً لأن صاحبه من دولة لم ندعمها بعد.
+    const contact = toE164(typed, body.country) || typed;
 
     await db.prepare('INSERT INTO service_requests (store_id, kind, contact, detail, status, created_at) VALUES (NULL,?,?,?,?,?)')
       .run(kind, contact, clean(body.detail, 800), 'open', now());
@@ -263,12 +373,16 @@ export default async function register(r) {
   // ── متاجر حقيقية للعرض في الصفحة الرئيسية (§٣.١) ──────
   r.get('/api/showcase', async (_req, res) => {
     const rows = await db.prepare(`
-      SELECT s.slug, s.name, s.sector, s.logo, s.banner, s.color, s.verified, s.city,
+      SELECT s.slug, s.name, s.sector, s.logo, s.banner, s.color, s.verified, s.city, s.country,
              (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id AND p.live = 1) products
       FROM stores s
       WHERE s.status = 'active'
       ORDER BY products DESC, s.id DESC
       LIMIT 6`).all();
-    json(res, rows.map((s) => ({ ...s, verified: !!s.verified, url: `/${s.slug}` })));
+    // العملة تُرسل محسوبة: المشهد على الصفحة الرئيسية يعرض
+    // أسعار متاجر حقيقية، وعرضها بعملة غير عملتها كذبٌ صغير
+    json(res, rows.map((s) => ({
+      ...s, verified: !!s.verified, currency: symbolOf(s.country), url: `/${s.slug}`,
+    })));
   });
 }

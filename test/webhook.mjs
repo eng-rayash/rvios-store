@@ -6,14 +6,14 @@
 import crypto from 'node:crypto';
 import { finish } from './finish.mjs';
 
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 const HOOK = B + '/api/webhooks/whatsapp';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 
 // الأسرار تُقرأ من .env عبر config — لا تُكتب في ملف اختبار أبداً.
 // اختبار يحمل مفتاحاً حقيقياً يسرّبه إلى Git مثل أي ملف آخر.
-const { config } = await import('../src/config.js');
+const { config } = await import('../server/config.js');
 const SECRET = config.meta.appSecret;
 const VERIFY = config.meta.verifyToken;
 

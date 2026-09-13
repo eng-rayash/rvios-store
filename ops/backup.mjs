@@ -1,6 +1,6 @@
 // نسخة احتياطية فورية —  npm run backup
-import { backupNow } from '../src/backup.js';
-import { db } from '../src/pg.js';
+import { backupNow } from '../server/backup.js';
+import { db } from '../server/pg.js';
 
 try {
   const info = await backupNow('manual');

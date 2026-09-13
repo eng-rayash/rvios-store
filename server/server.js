@@ -299,14 +299,16 @@ const server = http.createServer(async (req, res) => {
       if (serveFile(req, res, path.join(PUBLIC_DIR, 'favicon.ico'), { immutable: true })) return;
     }
 
-    // ٤. صفحات المنصة
+    /**
+     * ٤. صفحات المنصة الباقية هنا.
+     *
+     * الرئيسية والأسعار والقطاعات و«عن» و«تواصل» و«القانونية» انتقلت
+     * إلى تطبيق Next في `src/app`، وهي تُمرَّر إليه لا إلينا. ما بقي
+     * هو ما لم يُرحَّل بعد — وهو نفسه `LEGACY_PAGES` في
+     * `next.config.ts`: القائمتان تقصران معاً، وأي زيادة في
+     * إحداهما بلا الأخرى تعني صفحةً تُخدم مرّتين أو لا تُخدم أصلاً.
+     */
     const PAGES = {
-      '/':           'index.html',
-      '/pricing':    'pricing.html',
-      '/sectors':    'sectors.html',
-      '/about':      'about.html',
-      '/contact':    'contact.html',
-      '/legal':      'legal.html',
       '/login':      'login.html',
       '/track':      'track.html',
       '/onboarding': 'onboarding.html',

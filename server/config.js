@@ -161,6 +161,22 @@ export const config = {
     verifyToken: env.WA_VERIFY_TOKEN ?? '',
   },
 
+  /**
+   * تحقّق البريد عبر «تسجيل الدخول بجوجل».
+   *
+   * `clientId` وحده يكفي: نتحقّق من رمز الهوية (ID token) بمطابقة
+   * توقيعه على مفاتيح جوجل العامة، وهذا لا يحتاج سرّاً. تدفّق
+   * OAuth بالسرّ يلزم لو أردنا الوصول إلى بيانات المستخدم في
+   * جوجل، ونحن لا نريد إلا بريده مُثبَتاً.
+   *
+   * وحين يغيب المفتاح تُتخطّى الخطوة كلها بدل أن تنكسر: التطوير
+   * لا يجب أن يتوقّف على حساب في Google Cloud.
+   */
+  google: {
+    clientId: env.GOOGLE_CLIENT_ID ?? '',
+    get enabled() { return !!this.clientId; },
+  },
+
   sms: {
     url: env.SMS_URL ?? '',
     method: (env.SMS_METHOD ?? 'GET').toUpperCase(),

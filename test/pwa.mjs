@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import { finish } from './finish.mjs';
 
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 
@@ -81,7 +81,7 @@ console.log('\n── صفحة انقطاع الاتصال ──');
 
 console.log('\n── الربط في الصفحات ──');
 {
-  const pages = ['/', '/dashboard', '/login', '/pricing', '/yazan'];
+  const pages = ['/dashboard', '/login', '/track', '/yazan'];
   for (const p of pages) {
     const html = await (await fetch(B + p)).text();
     const hasManifest = html.includes('rel="manifest"');

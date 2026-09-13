@@ -10,13 +10,12 @@
 // ═══════════════════════════════════════════════════════════
 
 // الإصدار يُبدَّل عند كل نشر — بدونه يبقى المتصفح على أصول قديمة
-const VERSION = 'rvios-v3';
+const VERSION = 'rvios-v4';
 const SHELL = `${VERSION}-shell`;
 
 // أصول القشرة: ما تحتاجه الصفحة لترسم نفسها
 const SHELL_ASSETS = [
   '/assets/css/tokens.css',
-  '/assets/css/site.css',
   '/assets/css/dash.css',
   '/assets/css/store.css',
   '/assets/css/store-tiers.css',

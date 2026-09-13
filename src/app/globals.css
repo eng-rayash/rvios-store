@@ -1,0 +1,551 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════
+   نظام تصميم RVIOS — مصدر الحقيقة الوحيد
+   ─────────────────────────────────────────────────────────
+   القيم منقولة حرفياً من public/assets/css/tokens.css كي لا
+   تنفصل الواجهة الجديدة عن هوية المنصة أثناء الترحيل: متجر
+   يُصيَّر بالنظام القديم ولوحة تُصيَّر بالجديد يجب أن يبدوا
+   من عائلة واحدة.
+
+   لون المتجر (--shop) يُحقن وقت التشغيل من إعدادات التاجر،
+   ولا يعرف أي مكوّن لون أي متجر — تماماً كما في theme-core.
+   ═══════════════════════════════════════════════════════════ */
+/* ★ inline ضرورية لا تجميلية:
+   بدونها يحسب Tailwind قيمة كل لون عند `:root` — حيث لوحة
+   المتجر لم تُحقن بعد — فيثبّت القيمة الاحتياطية وتُهمل ألوان
+   التاجر تماماً. و`inline` تجعل الأداة تكتب `var(--cream)`
+   عند موضع الاستخدام، فتُحلّ على عنصر المتجر بلوحته هو. */
+@theme inline {
+  /* ── الهوية ──
+     كلها تقرأ من اللوحة المحقونة أولاً وتسقط على قيم RVIOS.
+     هذا جوهر المنتج: لون التاجر لا يصبغ الأزرار وحدها بل
+     **الأسطح والحدود والنصوص** — فيبدو المتجر ملكه لا قالباً
+     مستعاراً. وصفحات المنصة لا تحقن شيئاً فتأخذ القيم الأصلية. */
+  /* ── الأسطح: أبيض صريح، لا عاجيّ ──
+     العلاقة انعكست عن قصد: كان «الورق» أفتح من الأرضية، والآن
+     الأرضية أبيض خالص فلا شيء فوقه أفتح منه. صار «الورق» أخفض
+     درجة، فتُقرأ البطاقة فوق القسم الأبيض، ويُقرأ القسم الأبيض
+     فوق القسم الرمادي — والتناوب بين الأقسام يبقى محسوساً.
+
+     وبقيت ذرّة دفء في الرماديات (تميل صفرةً لا زرقة) لأن
+     النحاسيّ --brass لونٌ دافئ، ورماديٌّ بارد تحته يجعله يبدو
+     متسخاً لا ثميناً.
+
+     ولا يمسّ هذا متاجر التجّار: لوحاتها تُشتقّ من لون كل تاجر
+     في derivePalette، لا من هذه القيم الاحتياطية. */
+  --color-cream: var(--cream, #FFFFFF);
+  --color-paper: var(--paper, #F8F7F4);
+  --color-sand:  var(--sand,  #EFEDE7);
+  --color-line:  var(--line,  #DCD8CF);
+  /* حدٌّ أظهر درجةً — كان يُستدعى في contact-form بلا تعريف،
+     ففئةٌ ميّتة صامتة لا تُنتج خطأً ولا حدّاً. صار معرَّفاً. */
+  --color-line-strong: var(--line-strong, #C4BEB2);
+
+  --color-brass:      #C8A45D;
+  --color-brass-deep: #876522;
+
+  --color-ink:  var(--ink,  #241F1B);
+  --color-soft: var(--soft, #6B6259);
+
+  --color-ok:     #1a7c49;
+  --color-warn:   #E8A020;
+  --color-danger: #D62828;
+
+  /* ── لون المتجر: يُحقن وقت التشغيل ── */
+  --color-shop:      var(--shop, #9E2226);
+  --color-shop-deep: var(--shop-deep, #6E1519);
+  --color-shop-lift: var(--shop-lift, #C4494D);
+  --color-shop-text: var(--shop-text, #9E2226);
+  /* السطحان المصبوغان بلون المنصة. كانا عاجيّين ليذوبا في أرضية
+     عاجيّة؛ وفوق الأبيض كانا سيُقرآن رقعةً بيجاً. صارا وشماً
+     أحمر خافتاً — وهو ما تقوله حالة «مختار» أصلاً: حدٌّ أحمر
+     ونصٌّ أحمر وتعبئة من العائلة نفسها. */
+  --color-shop-veil: var(--shop-veil, #FBF1F0);
+  --color-shop-edge: var(--shop-edge, #E6CFCD);
+  --color-on-shop:   var(--on-shop, #fff);
+
+  /* ── الخطوط: ثلاثة أدوار لا ثلاثة أسماء ──
+     display → النصوص العربية الكبيرة (عناوين الأقسام والهيرو)
+     body    → النصوص العربية الصغيرة والعناوين الصغيرة
+     en      → العناوين الكبيرة اللاتينية (اسم العلامة وما شابه)
+
+     وخلف كل دور خطٌّ احتياطي من العائلة نفسها يلتقط ما ينقص
+     الخطّ الخاص من محارف (لاتينية، «»، —، …) — انظر layout.tsx. */
+  --font-display: var(--font-maghfira), var(--font-markazi), Georgia, serif;
+  /* ★ «مركزي» للنصّ — وهو الوجه الذي أعلنته الوثيقة (§٧٫١) أصلاً:
+     «Serif أنيق للعناوين + Sans نظيف للنصّ». وقد اختير عكس ذلك
+     عن قصد بعد المعاينة: الوجه النسخي يُقرأ أدفأ في النصّ العربي
+     الصغير، و«مغفرة» تبقى للعناوين الكبيرة فيبقى الزوج قائماً.
+     والاحتياطي `serif` لا `sans-serif`: وجهٌ نسخي يسقط على نسخيّ. */
+  --font-body:    var(--font-markazi), Georgia, "Times New Roman", serif;
+  --font-en:      var(--font-yapari), var(--font-markazi), Georgia, serif;
+
+  /* ── سلّم الخطّ: ست درجات، لا ثمانٍ وثلاثون ──
+     ★ رُفع السلّم كلّه ~١٢٪ حين صار «مركزي» خطّ النصّ.
+     الوجه النسخي ارتفاعه السينيّ أصغر من الهندسي عند المقاس
+     نفسه — فـ١٣٫٥px منه تُقرأ كـ١٢px من سابقه. والمقاس ليس رقماً
+     مطلقاً بل علاقةٌ بالوجه الذي يحمله، فتبديل الوجه يوجب
+     مراجعة السلّم. والنسب بين الدرجات محفوظة كما كانت. */
+  --text-2xs: 0.813rem;   /* 13px — كان 11.5 */
+  --text-xs:  0.875rem;   /* 14px — كان 12.5 */
+  --text-sm:  0.938rem;   /* 15px — كان 13.5 · وهو مقاس الجسم */
+  --text-md:  1.063rem;   /* 17px — كان 15   */
+  --text-lg:  1.188rem;   /* 19px — كان 17   */
+  --text-xl:  1.375rem;   /* 22px — كان 20   */
+
+  /* ── العناوين: ثلاث درجات مرنة، لا ثماني `clamp` متناثرة ──
+     كانت كل صفحة تكتب `clamp` خاصاً بها داخل JSX — ثماني قيم
+     مختلفة لأربعة عناوين تؤدّي الدور نفسه. والعين تقرأ الفرق
+     بين ٢٫٤rem و٢٫٦rem على أنه سهو لا قصد. */
+  --text-hero: clamp(2.6rem, 6vw, 4.4rem);   /* هيرو الرئيسية وحده */
+  --text-h1:   clamp(2.4rem, 5.4vw, 3.6rem); /* عنوان الصفحة الداخلية */
+  --text-h2:   clamp(2rem, 4.6vw, 3.1rem);   /* عنوان القسم */
+  --text-h3:   1.5rem;                       /* عنوان بطاقة أو قسم فرعي */
+
+  /* ★ السعر دورٌ لا مقاس.
+     أرقام الباقات كانت `text-5xl` — قيمة من افتراضيات Tailwind
+     خارج أي سلّم معلن. وهي ليست «عنواناً أكبر» بل **الرقم الذي
+     جاء الزائر ليقرأه**، فتستحقّ اسماً. والقيمة هي القيمة نفسها
+     (٣rem) — تسميةٌ لا تغيير، فلا يتحرّك شيء في الصفحة. */
+  --text-price: 3rem;
+
+  /* ── الرقم البارز: مؤشّرات اللوحة وسعة الباقة ومبالغ الفواتير ──
+     كانت ثلاثة أحجام خام لدورٍ واحد في dash.css (٣٧ و٣٢ و٣٠px)،
+     وبخطّ الزينة. صار رمزاً واحداً بخطّ النصّ المتغيّر — فالرقم
+     يُقرأ رقماً لا لافتة، ويأخذ وزناً حقيقياً لا تغليظاً. */
+  --text-stat: clamp(1.625rem, 2.4vw, 2.125rem);
+
+  /* ── عنوان الشاشة في اللوحة ──
+     بخطّ النصّ لا بخطّ الزينة: «مغفرة» للهيرو والتسويق وحدهما.
+     عنوانٌ مزخرف فوق جدول طلبات يُقرأ لافتة محلّ فوق دفتر حسابات. */
+  --text-title: clamp(1.375rem, 2vw, 1.75rem);
+
+  /* ── ارتفاع السطر: أربع درجات، لا تسع قيم عشوائية ──
+     tight للعناوين الكبيرة · snug للعناوين الصغيرة ·
+     body للنصّ · loose للفقرات الطويلة والشروح. */
+  --leading-tight: 1.15;
+  --leading-snug:  1.28;
+  --leading-body:  1.7;
+  --leading-loose: 1.9;
+
+  /* ── سلّم المسافات: خمس درجات ──
+     الأرقام الخام في Tailwind سلّمٌ رياضي لا سلّم تصميم: تسمح
+     بـ`gap-2` و`gap-2.5` و`gap-3` جنباً إلى جنب بفارق بكسلين
+     لا يقرؤه أحد قصداً. هذه الخمس تُسمّى بدورها فتُختار بالمعنى. */
+  /* ★★ الأسماء ليست اعتباطية — والتسمية الأولى كسرت الموقع.
+     كانت `xs·sm·md·lg·xl`، وهي **أسماء أحجام الحاويات نفسها** في
+     Tailwind. والأداة تُرجّح فضاء المسافات على فضاء الحاويات، فصار
+     `max-w-md` يساوي ١rem بدل ٢٨rem — أي أن كل عمود نصّ يحمل
+     `max-w-*` انهار إلى بضعة مليمترات، وانكسر السطر بعد كل كلمة.
+     ولا خطأ في البناء ولا تحذير: صنفٌ صحيح بقيمة أخرى.
+     فأي اسم يُضاف هنا يجب ألّا يكون حجم حاوية. */
+  --spacing-hair:  0.375rem;  /* 6px  — بين أيقونة ونصّها */
+  --spacing-snug:  0.625rem;  /* 10px — داخل العنصر الواحد */
+  --spacing-base:  1rem;      /* 16px — بين عناصر متجاورة */
+  --spacing-roomy: 1.5rem;    /* 24px — بين مجموعات */
+  --spacing-airy:  2.25rem;   /* 36px — بين كتل القسم */
+
+  /* ── سلّم نصف القطر: سبع درجات تغطّي الواجهة كلها ──
+     أُضيفت 2xl و3xl لأنهما مستعملتان فعلاً في المتجر (١٤ موضعاً)
+     وكانتا تسقطان على افتراضي Tailwind خارج السلّم المعلن —
+     أي سلّمٌ يُعلن خمساً وتُستعمل سبع. الإعلان يطابق الواقع الآن. */
+  --radius-sm:   6px;
+  --radius-DEFAULT: 10px;
+  --radius-lg:   14px;
+  --radius-xl:   18px;
+  --radius-2xl:  22px;
+  --radius-3xl:  28px;
+  --radius-pill: 40px;
+
+  /* ── الظلال ── */
+  --shadow-soft: 0 1px 2px rgba(36,31,27,.05), 0 8px 24px -12px rgba(36,31,27,.18);
+  --shadow-lift: 0 26px 60px -26px rgba(36,31,27,.42), 0 2px 6px rgba(36,31,27,.06);
+
+  /* ── منحنيات الحركة ── */
+  --ease-out-rv: cubic-bezier(.22,.61,.36,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+}
+
+/* إيقاع رأسي واحد لكل الأقسام — بدونه تُقرأ الصفحة كستّة مواقع */
+:root {
+  --bay: clamp(64px, 7vw, 96px);
+  --shop-rgb: 158, 34, 38;
+
+  /* حدٌّ أظهر من --line، لمّا يحتاج الحقل أن يُرى مركَّزاً */
+  --line-strong: #C4BEB2;
+
+  /* ── سلّم الطبقات ──
+     ليس لـTailwind فضاء رموز لـz-index، فتُكتب الأرقام خاماً
+     وتنتهي بغطاءٍ ودرجٍ على القيمة نفسها يتنازعان بترتيب DOM.
+     تُستعمل هكذا: `z-[var(--z-sheet)]`. */
+  --z-header:   30;
+  --z-dropdown: 40;
+  --z-overlay:  50;
+  --z-sheet:    60;
+  --z-toast:    70;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  /* الصفحة صارت هبوطاً واحداً يُتنقَّل فيه بالمرابط، والشريط
+     العلوي مثبّت — بدون هذا الهامش يقف كل قسم خلفه فيُقرأ
+     الزائر عنواناً مقصوصاً بعد كل نقرة. */
+  [id] { scroll-margin-top: 92px; }
+
+  body {
+    background: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* الأرقام تُرصف في أعمدة أينما اصطفّت */
+  table, .tabular { font-variant-numeric: tabular-nums; }
+
+  /* ── العلامة تصبغ ما يلمسه المستخدم لا الأزرار وحدها ──
+     التحديد ومؤشّر الكتابة وشريط التمرير ثلاثة أسطح يلمسها
+     الزائر في كل صفحة ولا ينتبه إليها — وتركها رماديةَ النظام
+     هو بالضبط ما يجعل الواجهة تُقرأ «قالباً». كانت معرَّفة في
+     tokens.css القديم وسقطت في الترحيل. */
+  ::selection {
+    background: color-mix(in oklab, var(--color-shop) 22%, transparent);
+    color: var(--color-ink);
+  }
+  html { scrollbar-color: var(--color-line) transparent; }
+  input, textarea, select { caret-color: var(--color-shop); }
+
+  :focus-visible {
+    outline: 2px solid var(--color-shop);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* احترام تفضيل تقليل الحركة على مستوى النظام كله */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .bay { padding-block: var(--bay); }
+  .wrap { width: min(1180px, 100% - 3rem); margin-inline: auto; }
+}
+
+@layer base {
+  /* ── إشعار تحديث عامل الخدمة ──
+     `pwa.js` (مشترك مع النظام القديم) يبني الشريط بصنفَي
+     `.toast.on` من `tokens.css` — وصفحات Next لا تحمّل ذلك الملف،
+     فكان الإشعار سيظهر نصّاً عارياً ملتصقاً بأسفل الصفحة.
+     ★ يُعرَّف بمعرّفه لا بصنفه: `.toast` اسمٌ عامّ سيُستعمل غداً
+     لمكوّن آخر فيرث هذه القواعد دون أن يعلم. */
+  #swUpdate {
+    position: fixed;
+    bottom: 24px;
+    inset-inline-end: 24px;
+    z-index: var(--z-toast);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: min(420px, calc(100vw - 48px));
+    padding: 12px 18px;
+    border-radius: var(--radius-sm);
+    background: var(--color-ink);
+    color: var(--color-cream);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    box-shadow: 0 12px 32px -10px rgba(36, 31, 27, .5);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   خامة وحركة — مفردات واحدة تتكرّر، لا حيلة لكل قسم
+   ─────────────────────────────────────────────────────────
+   ما يفصل واجهةً غاليةً عن واجهةٍ عامّة ليس عدد التأثيرات بل
+   قلّتها وانضباطها: نفس الحبيبات على كل سطح داكن، ونفس
+   الانزلاق على كل زرّ رئيسي، ونفس الشعرة النحاسية على كل حدّ
+   يُفترض أن يلتقط ضوءاً. ثلاثة أشياء تتكرّر تُقرأ **صنعة**؛
+   وثلاثون شيئاً مختلفاً تُقرأ زينةً مركّبة.
+   ═══════════════════════════════════════════════════════════ */
+@layer utilities {
+
+  /* ★ الموضع في `:where()` قصدٌ لا أسلوب.
+     الأداة تحتاج عنصراً يصلح حاويةً لـ`::before/::after`، فأكثر
+     مواضعها عناصر ساكنة تحتاج `relative`. لكن بعضها يُركَّب على
+     عنصر **مُوضَّع أصلاً** — كطبقة الضوء في الهيرو (`absolute
+     inset-0`). وقاعدة عادية هنا تكسب على أداة Tailwind لأنها
+     تليها في الملف، فتُحوّل تلك الطبقة إلى `relative` ويسقط
+     `inset-0` معها: صندوق بارتفاع صفر تنهار إليه كل الأضواء
+     المعلّقة داخله. و`:where()` بلا وزن، فتُطبَّق حين لا يُذكر
+     موضع وتنسحب حين يُذكر — وهو تعريف «القيمة الافتراضية». */
+  :where(.grain, .hairline, .sheen, .lume) { position: relative; }
+
+  /* ── الحبيبات ──
+     كانت الأسطح الداكنة تحمل شبكة نقاط ٣×٣ بكسل. الشبكة
+     منتظمة، والعين تلتقط انتظامها فتقرأ «قالباً»؛ والحبيبات
+     المشوّشة تُقرأ **ورقاً مطبوعاً**. والفرق كله في أن النقاط
+     تتكرّر والضجيج لا يتكرّر.
+
+     والمصدر مُولَّد لا مُحمَّل: feTurbulence داخل data: URI —
+     صفر طلب شبكة وصفر بايت ينتظره أول رسم. و`overlay` تجعل
+     الحبيبات تُضيء الداكن وتُظلم الفاتح بدل أن تُبيّض السطح. */
+  .grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: var(--grain, .14);
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── الشعرة النحاسية ──
+     خطّ بسمك بكسل واحد يبهت عند طرفيه، فوق حافّة سطح داكن.
+     يقول ما يقوله الحدّ المعدني في منتج مصنوع: هنا تنتهي
+     المادّة، وهنا يلتقط طرفُها الضوء. وبكسل واحد يفعل ما لا
+     يفعله إطار كامل — لأن الإطار يُرى والشعرة تُحسّ. */
+  .hairline::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      to left,
+      transparent, rgba(200,164,93,.05) 12%,
+      rgba(200,164,93,.42) 50%,
+      rgba(200,164,93,.05) 88%, transparent
+    );
+  }
+
+  /* ── انزلاق الضوء على الزرّ ──
+     ضوء يعبر الزرّ مرّة واحدة عند التحويم ثم يسكن. مرّة واحدة
+     بالذات: الوميض المتكرّر يُقرأ لافتةً، والعبور الواحد يُقرأ
+     سطحاً صقيلاً مرّ عليه ضوء.
+
+     و`--sheen` متغيّر لأن ضوء الأبيض على زرٍّ كريميّ لا يُرى —
+     هناك يصير الضوء نحاسياً. كلٌّ يعكس ما يقع عليه. */
+  .sheen { overflow: hidden; isolation: isolate; }
+  .sheen::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: 1;
+    pointer-events: none;
+    transform: translateX(120%);
+    background: linear-gradient(
+      100deg,
+      transparent 38%,
+      var(--sheen, rgba(255,255,255,.5)) 50%,
+      transparent 62%
+    );
+  }
+  /* في RTL يبدأ الضوء من اليمين — من حيث تبدأ القراءة */
+  .sheen:hover::after,
+  .sheen:focus-visible::after { animation: rv-sheen .72s var(--ease-out-rv); }
+  @keyframes rv-sheen {
+    from { transform: translateX(120%); }
+    to   { transform: translateX(-120%); }
+  }
+  /* الزرّ الفاتح يعكس نحاساً لا بياضاً */
+  .sheen-brass { --sheen: rgba(200,164,93,.55); }
+
+  /* ── البؤرة اللمّاعة ──
+     وهج ناعم يتبع المؤشّر داخل البطاقة. الإحداثيان يُكتبان من
+     JS في `--mx/--my`، والانتقال على العتامة وحدها — فتظهر
+     البؤرة وتختفي بهدوء ولا تلاحق المؤشّر بتأخّر مرئي.
+
+     وهذا بالضبط ما تفعله درجة «فاخر» في متاجر التجّار. عرضُها
+     هنا ليس زينةً على صفحة الهبوط بل **برهانٌ على ما نبيعه**. */
+  .lume { isolation: isolate; }
+  .lume::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .45s var(--ease-out-rv);
+    background: radial-gradient(
+      380px circle at var(--mx, 50%) var(--my, 0%),
+      rgba(var(--shop-rgb), .10), transparent 62%
+    );
+  }
+  .lume:hover::before,
+  .lume:focus-within::before { opacity: 1; }
+  /* على سطح داكن يصير الوهج نحاسياً: الأحمر على الحبر يُقرأ بقعة */
+  .lume-brass::before {
+    background: radial-gradient(
+      380px circle at var(--mx, 50%) var(--my, 0%),
+      rgba(200,164,93,.14), transparent 62%
+    );
+  }
+
+  /* الحركة كلها تسقط مع تفضيل السكون — لا تُبطّأ */
+  @media (prefers-reduced-motion: reduce) {
+    .sheen::after { display: none; }
+    .lume::before { display: none; }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   اللوح المعلّق — العنصر التوقيعي (§٧٫٣)
+   ─────────────────────────────────────────────────────────
+   «لوحة محل معلّقة واضحة في المقدمة، بينما لوحات محلات أخرى
+   تتلاشى في الخلفية.» هذا قرار الهوية المكتوب منذ البداية،
+   وكان منفَّذاً في موضعين اثنين فقط: صفحة ٤٠٤ وعمود التسجيل.
+   موضعان لا يصنعان لغةً بصرية — يصنعان صدفة.
+
+   وهنا يصير أداةً واحدة تُركَّب على أي سطح: بطاقة الإحصاء،
+   بطاقة الطلب، لوح القطاع، بطاقة الباقة. تكرارها هو ما يحوّلها
+   من زخرفة إلى **توقيع** — وهو نفس مبدأ الخامة أعلاه: ثلاثة
+   أشياء تتكرّر تُقرأ صنعة.
+
+   ولماذا لوحٌ لا بطاقة؟ لأن ما نبيعه متجر — والمتجر يُعرف
+   بلوحته. الاستعارة ليست تجميلاً بل هي **الحجّة نفسها**.
+   ═══════════════════════════════════════════════════════════ */
+@layer utilities {
+  /* ★ الموضع في `:where()` لنفس سبب الخامة أعلاه: قاعدةٌ عادية
+     هنا تكسب على أداة Tailwind لأنها تليها في الملف، فلوحٌ
+     أُريد له `absolute` يعود `relative` ويسقط `inset-0` معه. */
+  :where(.plaque) { position: relative; }
+
+  /* اللوح: سطحٌ يُقرأ معلّقاً لا ملصقاً — الظلّ تحته لا حوله */
+  .plaque {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* ── الحدّ العلوي بلون المتجر ──
+     هذا ما يحوّل «لوحاً» إلى «لوحة *هذا* المحل». في النسخة
+     الأصلية كان `border-top:4px solid var(--shop)` على معاينة
+     متجر التاجر، وهو أدقّ تفصيل في المفردة كلها: اللون لا
+     يصبغ اللوح بل يُتوَّج به — كشريط الطلاء على حافّة لافتة.
+
+     و`box-shadow` بدل `border-top` قصدٌ: حدٌّ حقيقي يزيح المحتوى
+     أربعة بكسلات ويكسر محاذاة اللوح مع جاره في الشبكة. */
+  .plaque-crest {
+    box-shadow:
+      inset 0 4px 0 0 var(--color-shop),
+      var(--shadow-soft);
+  }
+
+  /* على أرضية داكنة ينقلب الدور: اللوح يُضيء والظلّ يعمُق */
+  .plaque-ink {
+    background: var(--color-ink);
+    color: var(--color-cream);
+    border-color: rgba(200, 164, 93, .22);
+    box-shadow: 0 24px 60px -22px rgba(0, 0, 0, .6);
+  }
+
+  /* ── القضيب النحاسي والسلكان ──
+     ★ `opt-in` قصدٌ لا كسل: القضيب يطفو فوق اللوح، فيصطدم بما
+     قبله إن لم يُترك له متّسع. أداةٌ تُفسد التخطيط حين تُنسى
+     ليست أداةً بل فخّاً. فمن يطلبه يترك له `pt` ويعرف لماذا.
+
+     والسلكان في تدرّجين داخل `::after` الواحد لا عنصرين
+     إضافيين: DOM أنظف، ولا شيء يُقرأ لقارئ الشاشة. */
+  .plaque-rail::before {
+    content: '';
+    position: absolute;
+    top: -14px;
+    inset-inline: 18%;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--color-brass);
+    opacity: .55;
+    pointer-events: none;
+  }
+  .plaque-rail::after {
+    content: '';
+    position: absolute;
+    top: -13px;
+    inset-inline: 18%;
+    height: 14px;
+    pointer-events: none;
+    background:
+      linear-gradient(var(--color-brass-deep), var(--color-brass-deep)) 14% 0 / 1px 100% no-repeat,
+      linear-gradient(var(--color-brass-deep), var(--color-brass-deep)) 86% 0 / 1px 100% no-repeat;
+    opacity: .5;
+  }
+
+  /* ── الارتفاع عند التحويم ──
+     هذا ما تَعِد به باقة «بلس» حرفياً في plans.ts: «بطاقات
+     ترتفع». كان الوعد مكتوباً في صفحة الأسعار وغير منفَّذ في
+     أي بطاقة — وصفحةُ أسعارٍ تَعِد بما لا يُسلَّم تُبطل الهوية
+     كلها لا بنداً منها. */
+  .plaque-lift {
+    transition: transform .3s var(--ease-out-rv), box-shadow .3s var(--ease-out-rv);
+  }
+  .plaque-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lift);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .plaque-lift:hover { transform: none; }
+  }
+
+  /* ── النبضة ──
+     حلقة تتوسّع وتخبو حول نقطة خضراء. عنصرٌ واحد يقول ما تقوله
+     فقرة: الأمر حيٌّ لا صورة. تُستعمل حيث نؤكّد أن شيئاً يعمل
+     الآن — متجرٌ يستقبل الطلبات، أو خادمٌ متّصل. */
+  .ping {
+    position: relative;
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-ok);
+  }
+  .ping::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--color-ok);
+    opacity: .5;
+    animation: rv-ping 2s ease-out infinite;
+  }
+  @keyframes rv-ping {
+    from { transform: scale(.6); opacity: .7; }
+    to   { transform: scale(1.5); opacity: 0; }
+  }
+  /* الحركة المتكرّرة تسقط كاملةً مع تفضيل السكون — لا تُبطّأ.
+     القاعدة العامة تُقصّر المدّة إلى .01ms، وحلقةٌ تومض بهذه
+     السرعة أسوأ من غيابها. */
+  @media (prefers-reduced-motion: reduce) {
+    .ping::after { display: none; }
+  }
+}
+
+@layer utilities {
+  /* ── صعود الكلمة من تحت قناعها ──
+     الحالة النهائية هي الأصل، و`both` هي التي تُنزل الكلمة
+     للحظة البداية. انظر تعليق `ui/words.tsx`. */
+  @keyframes rv-word {
+    from { transform: translateY(110%); }
+    to   { transform: translateY(0); }
+  }
+
+  /* ── الشعرة تُرسم من جهة القراءة ── */
+  @keyframes rv-rule {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+}

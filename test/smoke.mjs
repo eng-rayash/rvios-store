@@ -1,5 +1,5 @@
 import { finish } from './finish.mjs';
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 
@@ -139,9 +139,12 @@ ok(illegal.status === 409, 'رُفض انتقال غير مسموح (مكتمل 
 
 console.log('\n── أمان رمز التحقق (§٢) ──');
 {
-  const { db } = await import('../src/db.js');
+  const { db } = await import('../server/db.js');
+  const { toE164 } = await import('../server/countries.js');
   await j('POST', '/api/auth/request-code', { phone: '770333222' });
-  const stored = await db.prepare('SELECT code FROM otps WHERE phone = ?').get('770333222');
+  // الرمز مفتاحه الرقم **الدولي**: الخادم يوحّد قبل التخزين،
+  // والبحث بالصيغة المحلية لا يجد شيئاً
+  const stored = await db.prepare('SELECT code FROM otps WHERE phone = ?').get(toE164('770333222'));
   ok(/^[a-f0-9]{64}$/.test(stored.code), 'الرمز مخزَّن كتجزئة HMAC لا خاماً (§٢.١)');
 
   const a = await j('POST', '/api/auth/verify', { phone: '779999999', code: '123456' });
@@ -217,7 +220,7 @@ const adm = await j('POST', '/api/admin/login', { pass: 'rvios-admin' });
 const AID = adm.cookie.split(';')[0];
 ok(adm.status === 200, 'دخول الإدارة');
 const stats = await j('GET', '/api/admin/stats', null, AID);
-// بذرة seed.js: يزن (بلس) · نورا (مجانية) · أطلس (برو) · متجر موقوف
+// بذرة seed.js: يزن (بلس) · نورا (مجانية) · سيركل تك (برو) · متجر موقوف
 ok(stats.data.stores === 4, `عدد المتاجر = ${stats.data.stores}`);
 ok(typeof stats.data.activationRate === 'number', `معدل التفعيل = ${stats.data.activationRate}%`);
 ok(stats.data.openReports >= 2, `بلاغات مفتوحة = ${stats.data.openReports}`);

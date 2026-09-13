@@ -34,7 +34,8 @@
       <label class="field">
         <span>رقم الجوال</span>
         <div class="slugbox">
-          <span class="pre">+967</span>
+          <!-- تُملأ من countries.js: قائمة الدول مكان واحد لا اثنان -->
+          <select class="pre" id="country" aria-label="الدولة"></select>
           <input type="tel" id="phone" inputmode="numeric" placeholder="٧٧٧ ١٢٣ ٤٥٦" autocomplete="tel">
         </div>
         <div class="err" id="phoneErr" hidden></div>

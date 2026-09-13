@@ -1,7 +1,7 @@
 import { finish } from './finish.mjs';
 // اختبار رفع الصور: data URI → ملف على القرص
 import fs from 'node:fs';
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 
@@ -57,7 +57,7 @@ const bad3 = await j('PATCH', '/api/me/store', { logo: huge }, SID);
 ok(bad3.status === 413 || bad3.status === 400, `رُفضت صورة ضخمة (${bad3.status})`);
 
 console.log('\n── منع الخروج من المجلد ──');
-const trav = await fetch(B + '/uploads/../../src/db.js');
+const trav = await fetch(B + '/uploads/../../server/db.js');
 ok(trav.status === 404, 'رُفض مسار يحاول الخروج من المجلد');
 
 await j('DELETE', `/api/me/products/${prod.data.product.id}`, null, SID);

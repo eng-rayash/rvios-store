@@ -392,3 +392,53 @@ html[dir=rtl] .drawer{transform:translateX(-100%)}
 .vopt.out.on{background:transparent;color:var(--soft);border-color:var(--line)}
 .vopt:disabled{cursor:not-allowed}
 .vstate{font-size:var(--fs-xs);font-weight:700;color:var(--soft);min-height:1.2em}
+
+/* ═══ التقييمات ═══════════════════════════════════════════
+   النجمة رسمٌ لا محرف: «★» يختلف شكله وعرضه بين الخطوط،
+   ونصفُ نجمةٍ به مستحيل — والنصف هو ما يفرّق ٤٫٢ عن ٤٫٨. */
+.stars{display:inline-flex;gap:2px;vertical-align:middle;line-height:0}
+.stars svg{width:13px;height:13px;display:block}
+.stars.lg svg{width:20px;height:20px}
+.stars .bg{fill:var(--line)}
+.stars .fg{fill:var(--brass,#C6A15B)}
+
+.rrow{display:flex;align-items:center;gap:6px;margin:6px 0 2px;font-size:var(--fs-2xs)}
+.rrow b{font-family:var(--body);font-weight:700;color:var(--ink)}
+.rrow span{color:var(--soft)}
+.rrow.none{color:var(--soft);opacity:.7}
+
+.revs{margin-top:22px;padding-top:20px;border-top:1.5px solid var(--line)}
+.revs h3{font-size:var(--fs-md);margin-bottom:14px}
+.rempty{color:var(--soft);font-size:var(--fs-sm);margin-bottom:14px}
+
+.rsum{display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.ravg{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:96px}
+.ravg strong{font-size:34px;font-weight:800;line-height:1}
+.ravg span{font-size:var(--fs-2xs);color:var(--soft)}
+.rhist{flex:1;min-width:170px;display:flex;flex-direction:column;gap:3px}
+.hbar{display:flex;align-items:center;gap:7px;font-size:var(--fs-2xs);color:var(--soft)}
+.hbar i{flex:1;height:6px;background:var(--line);border-radius:99px;overflow:hidden}
+.hbar i b{display:block;height:100%;background:var(--brass,#C6A15B);border-radius:99px}
+.hbar em{font-style:normal;min-width:18px;text-align:left}
+
+.rlist{display:flex;flex-direction:column;gap:14px;margin-bottom:16px}
+.rev header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.rev header b{font-size:var(--fs-xs)}
+.rev header time{font-size:var(--fs-2xs);color:var(--soft);margin-inline-start:auto}
+.rev p{font-size:var(--fs-sm);line-height:1.75;color:var(--ink)}
+.vbadge{font-size:var(--fs-2xs);font-weight:700;color:var(--ok);
+  background:color-mix(in srgb,var(--ok) 12%,transparent);
+  padding:2px 7px;border-radius:99px}
+.rreply{margin-top:8px;padding:9px 12px;border-radius:var(--r-sm);
+  background:var(--sand,rgba(0,0,0,.04));border-inline-start:2.5px solid var(--shop)}
+.rreply b{display:block;font-size:var(--fs-2xs);color:var(--shop);margin-bottom:3px}
+.rreply p{font-size:var(--fs-xs)}
+
+.rform{border:1.5px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.rform summary{cursor:pointer;font-weight:700;font-size:var(--fs-sm)}
+.rform form{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.rpick{display:flex;gap:3px}
+.rpick button{background:none;border:none;padding:2px;cursor:pointer;line-height:0}
+.rpick svg{width:27px;height:27px;fill:var(--line);transition:fill .12s}
+.rpick button.on svg{fill:var(--brass,#C6A15B)}
+.rev-load{color:var(--soft);text-align:center;padding:14px}

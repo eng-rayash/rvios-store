@@ -16,8 +16,9 @@ import { db } from './db.js';
 /** الجداول التي لا يجوز لمسها بدون store_id */
 export const TENANT_TABLES = new Set([
   'categories', 'products', 'product_images', 'product_variants',
-  'orders', 'order_items',
+  'orders', 'order_items', 'customers', 'delivery_zones',
   'visits', 'reports', 'service_requests', 'invoices', 'subscriptions',
+  'product_reviews',
 ]);
 
 export class TenancyError extends Error {

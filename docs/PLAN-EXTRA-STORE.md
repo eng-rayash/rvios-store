@@ -1,6 +1,6 @@
 # خطة: المتجر الإضافي (باقة برو)
 
-**الحالة:** ✅ **مُنفَّذ ومُختبَر** — ٣٩ فحصاً في [`test/stores.mjs`](test/stores.mjs)
+**الحالة:** ✅ **مُنفَّذ ومُختبَر** — ٣٩ فحصاً في [`test/stores.mjs`](../test/stores.mjs)
 **المرجع:** تقرير الباقات والتسعير §٢ و§٦.٢ · المواصفة التقنية §٢.١
 
 ## ما نُفِّذ فعلاً
@@ -21,7 +21,7 @@
 | مقاييس الإدارة بالتجار لا بالمتاجر | ✅ |
 
 **الافتراضات المتَّخذة:** سقف ٥ متاجر · المتجر الإضافي يرث باقة الحساب ·
-انتهاء برو يُخفي ولا يحذف. غيّرها في `MAX_STORE_SLOTS` و`src/routes/auth.js`.
+انتهاء برو يُخفي ولا يحذف. غيّرها في `MAX_STORE_SLOTS` و`server/routes/auth.js`.
 
 ---
 
@@ -32,7 +32,7 @@
 ## السياق
 
 باقة برو **تَعِد صراحةً** بـ«أكثر من متجر واحد» في صفحة الأسعار وفي `PLANS.pro.features`،
-بينما [`src/routes/auth.js:105`](src/routes/auth.js) يرفض المتجر الثاني لكل الباقات بلا استثناء:
+بينما [`server/routes/auth.js:105`](../server/routes/auth.js) يرفض المتجر الثاني لكل الباقات بلا استثناء:
 
 ```js
 const existing = db.prepare('SELECT id FROM stores WHERE merchant_id = ?').get(merchant.id);
@@ -57,7 +57,7 @@ if (existing) bad('لديك متجر بالفعل');
 **النموذج الصحيح:** برو **تفتح الإمكانية**، وكل متجر إضافي يُشترى بـ$٣ شهرياً.
 لا يوجد متجر مجاني مشمول.
 
-**التعديل المطلوب في [`src/plans.js`](src/plans.js):**
+**التعديل المطلوب في [`server/plans.js`](../server/plans.js):**
 
 ```js
 // بدل extraStores: 1  (تعني «واحد مجاني»)
@@ -67,8 +67,9 @@ maxExtraStores: 5,            // سقف تشغيلي، لا وعد بالمجا�
 وتصحيح نص الميزة من «أكثر من متجر واحد» إلى **«متاجر إضافية بسعر مخفّض»**
 كي لا يفهم التاجر أنها مشمولة.
 
-> `extraStores` حقل ميت اليوم: مُعرَّف في ثلاث باقات، ومقروء في مكان واحد فقط
-> ([`page-pricing.js:17`](public/assets/js/page-pricing.js)) للعرض، ولا يُفحص في الخادم إطلاقاً.
+> `extraStores` حقل ميت تماماً اليوم: مُعرَّف في ثلاث باقات، ولا يُقرأ في أي
+> مكان — كان يُقرأ في `page-pricing.js` قبل أن تنتقل صفحة الأسعار إلى
+> [`src/app/pricing/page.tsx`](../src/app/pricing/page.tsx)، ولا يُفحص في الخادم إطلاقاً.
 
 ---
 
@@ -76,7 +77,7 @@ maxExtraStores: 5,            // سقف تشغيلي، لا وعد بالمجا�
 
 المتاجر الإضافية تُشترى، فالعدد المسموح يجب أن يكون **رقماً مملوكاً للحساب** لا مشتقاً من الباقة.
 
-**تعديل المخطط** في [`src/db.js`](src/db.js):
+**تعديل المخطط** في [`server/db.js`](../server/db.js):
 
 ```sql
 ALTER TABLE merchants ADD COLUMN store_slots INTEGER NOT NULL DEFAULT 1;
@@ -94,14 +95,14 @@ ALTER TABLE merchants ADD COLUMN store_slots INTEGER NOT NULL DEFAULT 1;
 
 ## ٣. حلّ «المتجر النشط» — جذر المشكلة
 
-[`src/auth.js:178`](src/auth.js) هو الموضع الأهم في المشروع:
+[`server/auth.js:178`](../server/auth.js) هو الموضع الأهم في المشروع:
 
 ```js
 const store = db.prepare('SELECT * FROM stores WHERE merchant_id = ? ORDER BY id LIMIT 1').get(m.id);
 ```
 
 `ORDER BY id LIMIT 1` يختار **أقدم** متجر ويتجاهل الباقي بصمت. تمر منه **٢١ مساراً**
-في [`src/routes/merchant.js`](src/routes/merchant.js)، ولا يقرأ أي معرّف متجر من الطلب.
+في [`server/routes/merchant.js`](../server/routes/merchant.js)، ولا يقرأ أي معرّف متجر من الطلب.
 
 ### الحل: ترتيب حلّ من ثلاث درجات
 
@@ -148,7 +149,7 @@ POST /api/me/active-store   { store: "slug-or-id" }
 
 ## ٤. الواجهة: مبدّل في الشريط العلوي
 
-الشريط العلوي اليوم ([`public/dashboard.html`](public/dashboard.html)) يحمل شريحة الرابط
+الشريط العلوي اليوم ([`public/dashboard.html`](../public/dashboard.html)) يحمل شريحة الرابط
 `#shopLink` وكتلة `.who`. المبدّل يحل محل شريحة الرابط الساكنة:
 
 ```
@@ -161,23 +162,23 @@ POST /api/me/active-store   { store: "slug-or-id" }
 - `applyTheme(STORE)` يُعاد استدعاؤه فيتغيّر لون اللوحة مع المتجر — إشارة بصرية فورية
   أنك في متجر آخر (يمنع تعديل منتج في المتجر الخطأ)
 
-**تعديلات [`dashboard.js`](public/assets/js/dashboard.js):**
+**تعديلات [`dashboard.js`](../public/assets/js/dashboard.js):**
 - `boot()` يقرأ `me.stores` (جمع) بدل `me.hasStore` (مفرد)
 - `loadStore()` يملأ المبدّل من `res.stores`
 - إضافة `switchStore(slug)` تستدعي المسار ثم تعيد `Promise.all([...])` نفسها الموجودة في `boot()`
 
-**تعديل [`app.js`](public/assets/js/app.js):** إرسال `X-Store` في كل نداء — نقطة واحدة،
+**تعديل [`app.js`](../public/assets/js/app.js):** إرسال `X-Store` في كل نداء — نقطة واحدة،
 لأن كل الطلبات تمر من `request()`.
 
 ---
 
 ## ٥. الفوترة: من فاتورة مدفوعة إلى متجر فعلي
 
-`extra_store` **نوع فاتورة معرَّف وقابل للدفع بالكامل اليوم** ([`src/billing.js:127`](src/billing.js))،
+`extra_store` **نوع فاتورة معرَّف وقابل للدفع بالكامل اليوم** ([`server/billing.js:127`](../server/billing.js))،
 لكن `submitProof` و`markPaid` يتعاملان مع `kind === 'subscription'` فقط — فهو
 **يُدفع ثم لا يفعل شيئاً**.
 
-**المطلوب في [`src/billing.js`](src/billing.js):**
+**المطلوب في [`server/billing.js`](../server/billing.js):**
 
 ```js
 // داخل submitProof() و markPaid()
@@ -197,7 +198,7 @@ if (inv.kind === 'extra_store') revokeStoreSlot(inv.store_id);
 
 ## ٦. إنشاء المتجر الثاني
 
-استبدال القيد في [`src/routes/auth.js:105`](src/routes/auth.js):
+استبدال القيد في [`server/routes/auth.js:105`](../server/routes/auth.js):
 
 ```js
 const owned = db.prepare('SELECT COUNT(*) n FROM stores WHERE merchant_id = ?').get(merchant.id).n;
@@ -214,7 +215,7 @@ if (owned >= merchant.store_slots) {
 3. **الاشتراك** — `ensureSubscription(storeId)` **لا تُستدعى عند إنشاء المتجر أصلاً**
    (تُستدعى فقط من `activatePlan`). المتجر الجديد يحتاج صف اشتراك.
 
-**تدفق الإعداد:** [`onboarding.js:283`](public/assets/js/onboarding.js) يعيد التوجيه فوراً
+**تدفق الإعداد:** [`onboarding.js:283`](../public/assets/js/onboarding.js) يعيد التوجيه فوراً
 إن `me.hasStore` — يجب أن يسمح بالمرور حين توجد خانة شاغرة، مع تخطي خطوتَي الجوال والرمز
 (التاجر مسجّل أصلاً).
 
@@ -222,7 +223,7 @@ if (owned >= merchant.store_slots) {
 
 ## ٧. إصلاح خلل قائم يظهر عند التعدد
 
-[`src/routes/merchant.js:364`](src/routes/merchant.js) — حذف الحساب:
+[`server/routes/merchant.js:364`](../server/routes/merchant.js) — حذف الحساب:
 
 ```js
 const { merchant, store } = requireStore(req);
@@ -243,7 +244,7 @@ db.prepare('DELETE FROM stores WHERE merchant_id = ?').run(merchant.id);   // �
 
 ## ٨. لوحة الإدارة
 
-اليوم [`admin.js:65`](src/routes/admin.js) يعرض صفاً لكل متجر — تاجر بثلاثة متاجر يظهر
+اليوم [`admin.js:65`](../server/routes/admin.js) يعرض صفاً لكل متجر — تاجر بثلاثة متاجر يظهر
 اسمه ورقمه مكرراً ثلاث مرات. والإحصاءات كلها مقسومة على **عدد المتاجر** لا التجار
 (`activationRate`, `upgradeRate`)، وهو صحيح فقط عند تطابق العددين.
 
@@ -256,19 +257,19 @@ db.prepare('DELETE FROM stores WHERE merchant_id = ?').run(merchant.id);   // �
 
 | الملف | التغيير |
 |---|---|
-| `src/db.js` | عمودان: `merchants.store_slots` · `sessions.active_store_id` |
-| `src/auth.js` | `requireStore` بثلاث درجات · `sessionActiveStore` |
-| `src/plans.js` | `canBuyExtraStores` بدل `extraStores` · تصحيح نص الميزة |
-| `src/billing.js` | `grantStoreSlot` / `revokeStoreSlot` · ربطهما بـ`extra_store` |
-| `src/routes/auth.js` | قيد الخانات بدل الرفض المطلق · وراثة الباقة · `ensureSubscription` |
-| `src/routes/merchant.js` | `POST /api/me/active-store` · فصل حذف المتجر عن حذف الحساب |
-| `src/routes/admin.js` | عمود عدد المتاجر · تصحيح مقامات النسب |
+| `server/db.js` | عمودان: `merchants.store_slots` · `sessions.active_store_id` |
+| `server/auth.js` | `requireStore` بثلاث درجات · `sessionActiveStore` |
+| `server/plans.js` | `canBuyExtraStores` بدل `extraStores` · تصحيح نص الميزة |
+| `server/billing.js` | `grantStoreSlot` / `revokeStoreSlot` · ربطهما بـ`extra_store` |
+| `server/routes/auth.js` | قيد الخانات بدل الرفض المطلق · وراثة الباقة · `ensureSubscription` |
+| `server/routes/merchant.js` | `POST /api/me/active-store` · فصل حذف المتجر عن حذف الحساب |
+| `server/routes/admin.js` | عمود عدد المتاجر · تصحيح مقامات النسب |
 | `public/assets/js/app.js` | إرسال `X-Store` في كل نداء |
 | `public/dashboard.html` + `dashboard.js` + `dash.css` | مبدّل المتاجر |
 | `public/assets/js/onboarding.js` | السماح بمتجر ثانٍ عند وجود خانة |
 | `test/stores.mjs` | **جديد** — مجموعة فحوص للتعدد |
 
-**لا يتغيّر:** [`src/tenancy.js`](src/tenancy.js) بالكامل — `scope()` تعزل متجراً عن متجر
+**لا يتغيّر:** [`server/tenancy.js`](../server/tenancy.js) بالكامل — `scope()` تعزل متجراً عن متجر
 ولو كانا لنفس التاجر، وهذا هو المطلوب بالضبط.
 
 ---

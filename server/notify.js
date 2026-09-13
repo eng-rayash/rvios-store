@@ -15,13 +15,16 @@
 import crypto from 'node:crypto';
 import { config } from './config.js';
 import { db, now } from './db.js';
+import { symbolOf } from './countries.js';
 
 export const OTP_PROVIDER = config.otp.provider;
 // الرمز يُعرض في الرد فقط حين تكون الطباعة قناة فعلية — وحتى
 // حينها يبقى محكوماً بوضع التطوير في auth.js
 export const DEV_SHOWS_CODE = OTP_PROVIDER.split(',').some((s) => s.trim() === 'console');
 
-const intl = (p) => `967${p}`;
+// الأرقام مخزَّنة E.164 منذ هجرة الأرقام، فلا يُركَّب رمز دولة
+// فوق رمز — وإلا صار رقم سيركل تك `967967712334455` ولم يصله شيء.
+const intl = (p) => String(p ?? '');
 
 // ── ١. وضع التطوير ───────────────────────────────────────
 async function viaConsole(phone, code) {
@@ -268,7 +271,7 @@ export async function notifyNewOrder(store, order) {
     '',
     items,
     '',
-    `الإجمالي: ${order.total.toLocaleString('en-US')} ر.ي`,
+    `الإجمالي: ${order.total.toLocaleString('en-US')} ${symbolOf(store.country)}`,
     '',
     'افتح لوحتك لتأكيد الطلب.',
   ].filter(Boolean).join('\n');

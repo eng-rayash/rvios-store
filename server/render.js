@@ -12,6 +12,7 @@
 import { scope } from './tenancy.js';
 import { derivePalette, paletteCss, tierOf, skinOf } from '../public/assets/js/theme-core.js';
 import { effectiveTheme } from './routes/merchant.js';
+import { symbolOf } from './countries.js';
 
 const esc = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -47,7 +48,7 @@ export async function renderStore(html, store, origin) {
 <link rel="canonical" href="${esc(url)}">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RVIOS Store">
-<meta property="og:locale" content="ar_YE">
+<meta property="og:locale" content="ar_${esc(store.country || 'YE')}">
 <meta property="og:title" content="${esc(store.name)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(url)}">
@@ -64,8 +65,10 @@ export async function renderStore(html, store, origin) {
     description: desc,
     url,
     image: absImage,
-    ...(store.city ? { address: { '@type': 'PostalAddress', addressLocality: store.city, addressCountry: 'YE' } } : {}),
-    ...(store.whatsapp ? { telephone: `+967${store.whatsapp}` } : {}),
+    ...(store.city ? { address: { '@type': 'PostalAddress', addressLocality: store.city,
+                                  addressCountry: store.country || 'YE' } } : {}),
+    // الرقم مخزَّن E.164، فلا يُسبق برمز دولة ثانٍ
+    ...(store.whatsapp ? { telephone: `+${store.whatsapp}` } : {}),
   })}</script>`;
 
   // ── محتوى أولي يقرأه الزاحف قبل تنفيذ JS ──
@@ -74,7 +77,7 @@ export async function renderStore(html, store, origin) {
     <article>
       <h3>${esc(p.name)}</h3>
       ${p.summary ? `<p>${esc(p.summary)}</p>` : ''}
-      <p>${AR(p.price)} ريال يمني${p.qty > 0 ? '' : ' — نفد المخزون'}</p>
+      <p>${AR(p.price)} ${esc(symbolOf(store.country))}${p.qty > 0 ? '' : ' — نفد المخزون'}</p>
     </article>`).join('');
 
   const noscript = `

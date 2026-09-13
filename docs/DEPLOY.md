@@ -14,8 +14,11 @@
 | **نطاق** | رابط المتجر يُنشر في واتساب مرة واحدة ولا يُصحَّح |
 | **حساب Meta للأعمال** | لإرسال رموز التحقق (اختياري في البداية) |
 
-الاعتماديات: **حزمة واحدة** (`postgres`) بلا اعتماديات متعدّية.
-تحقّق بنفسك: `npm ls --all`.
+الاعتماديات: الحزمة واحدة تضمّ الواجهة (Next وReact) والخادم معاً.
+لكنّ **الخادم نفسه** ما يزال على اعتمادية واحدة (`postgres`): هو ما
+يحمل المصادقة والطلبات والفوترة، وكل حزمة تدخله تدخل معها سطح هجوم.
+تحقّق بنفسك: `npm run check:server-deps` — يقرأ ما يستورده `server/`
+فعلاً، لا ما هو مثبَّت في الشجرة.
 
 ---
 
@@ -113,7 +116,9 @@ docker compose logs -f app
 sudo useradd -r -s /bin/false rvios
 sudo mkdir -p /srv/rvios && sudo chown rvios:rvios /srv/rvios
 # انسخ المصدر إلى /srv/rvios ثم:
-cd /srv/rvios && npm ci --omit=dev
+# ‏--omit=dev لا يصلح هنا: بناء Next يحتاج tailwind وtypescript،
+# وقراءة next.config.ts وقت التشغيل تحتاج typescript أيضاً.
+cd /srv/rvios && npm ci && npm run build
 sudo cp ops/rvios.service /etc/systemd/system/
 sudo systemctl enable --now rvios
 ```
@@ -319,7 +324,7 @@ psql "$DATABASE_URL" -f ops/postgres-rls.sql
 
 ## ملحق: متغيّرات البيئة
 
-`.env.example` يوثّق **٤٨ متغيّراً** — كل ما يقرؤه `src/config.js`
+`.env.example` يوثّق **٤٨ متغيّراً** — كل ما يقرؤه `server/config.js`
 بلا استثناء. الإلزامية في الإنتاج أربعة فقط:
 
 ```

@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════
 import { finish } from './finish.mjs';
 
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 
@@ -15,8 +15,8 @@ const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.
  * حدّ نريد بقاءه. المرور به هنا يجعل هذه المجموعة تفشل لمجرّد
  * أنها تلي مجموعة أخرى استعملت الرقم نفسه.
  */
-const { db: _db } = await import('../src/db.js');
-const { createSession, SESSION_COOKIE } = await import('../src/auth.js');
+const { db: _db } = await import('../server/db.js');
+const { createSession, SESSION_COOKIE } = await import('../server/auth.js');
 
 const merchant = await _db.prepare(
   "SELECT m.* FROM merchants m JOIN stores s ON s.merchant_id = m.id WHERE s.slug = 'yazan'",
@@ -45,8 +45,8 @@ ok(first.perPage === 50, 'خمسون طلباً في الصفحة');
 //  طلبات كل عشر دقائق لكل عنوان — وهو حدّ سليم نريد بقاءه.
 console.log('\n── إنشاء ١٣٠ طلباً ──');
 const db = _db;
-const { placeOrder } = await import('../src/orders.js');
-const { scope } = await import('../src/tenancy.js');
+const { placeOrder } = await import('../server/orders.js');
+const { scope } = await import('../server/tenancy.js');
 
 const yazan = await db.prepare("SELECT * FROM stores WHERE slug='yazan'").get();
 const nura  = await db.prepare("SELECT * FROM stores WHERE slug='nura-boutique'").get();

@@ -11,15 +11,18 @@ import {
   storesOf, setActiveStore,
 } from '../auth.js';
 import { PLANS, planOf, canAddProduct, capacityLabel, ADDONS } from '../plans.js';
-import { SKINS } from '../../public/assets/js/theme-core.js';
-import { ORDER_STATES, withItems, advance, waLink, waAsk } from '../orders.js';
+import { SKINS, LAYOUTS } from '../../public/assets/js/theme-core.js';
+import { ORDER_STATES, withItems, advance, waLink, waAsk, PAY_METHODS } from '../orders.js';
 import { checkSlug } from '../slug.js';
+import { COUNTRIES, DEFAULT_COUNTRY, symbolOf } from '../countries.js';
+import { isSector } from '../sectors.js';
 import { saveImage, syncGallery, galleryOf, dropStoreImages } from '../uploads.js';
 import { syncVariants, variantsOf } from '../variants.js';
 import {
   subscriptionOf, planPrices, addonPrices, paymentMethods, YEARLY_MONTHS_FREE,
   createInvoice, submitProof, hiddenByPlanCount, slotsOf,
 } from '../billing.js';
+import { storeSummary } from '../reviews.js';
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
@@ -126,6 +129,194 @@ export default async function register(r) {
     const { status } = await readBody(req);
     const updated = await advance(store.id, toInt(req.params.id), status);
     json(res, { ok: true, order: await withItems(store.id, updated) });
+  });
+
+  // ── تأكيد دفع طلب ─────────────────────────────────────
+  //  قرار التاجر وحده: المنصة لا تتحقق من الإيصال ولا تضمنه.
+  r.patch('/api/me/orders/:id/payment', async (req, res) => {
+    const { store } = await requireStore(req);
+    const s = scope(store.id);
+    const id = toInt(req.params.id);
+
+    const order = await s.get('orders', { id });
+    if (!order) notFound('الطلب غير موجود');
+    if (order.pay_method === 'cod') bad('هذا الطلب دفعه عند الاستلام');
+
+    const { paid } = await readBody(req);
+    // الرفض يعيد الطلب إلى «بانتظار التحويل» لا إلى الصفر: العميل
+    // قد يرفع إيصالاً صحيحاً بعد خاطئ، ولا يبدأ من جديد
+    await s.update('orders', id, { pay_status: paid ? 'paid' : 'await' });
+
+    json(res, { ok: true, payStatus: paid ? 'paid' : 'await' });
+  });
+
+  // ── مناطق التوصيل ─────────────────────────────────────
+  r.get('/api/me/zones', async (req, res) => {
+    const { store } = await requireStore(req);
+    const zones = await scope(store.id).all('delivery_zones', {}, { order: 'sort, id' });
+    json(res, {
+      zones,
+      // الرسم العام يظهر معها: هو ما يُطبَّق حين لا مناطق
+      fallback: {
+        fee: store.delivery_fee ?? 0,
+        freeOver: store.delivery_free_over ?? 0,
+      },
+    });
+  });
+
+  r.post('/api/me/zones', async (req, res) => {
+    const { store } = await requireStore(req);
+    const s = scope(store.id);
+    const body = await readBody(req);
+
+    const name = clean(body.name, 60);
+    if (!name) bad('اسم المنطقة مطلوب');
+
+    const count = await s.count('delivery_zones', {});
+    if (count >= 40) bad('بلغتَ حدّ أربعين منطقة');
+
+    const id = await s.insert('delivery_zones', {
+      name,
+      fee: Math.max(0, toInt(body.fee)),
+      free_over: Math.max(0, toInt(body.freeOver)),
+      sort: count,
+    });
+    json(res, { ok: true, zone: await s.get('delivery_zones', { id }) }, 201);
+  });
+
+  r.patch('/api/me/zones/:id', async (req, res) => {
+    const { store } = await requireStore(req);
+    const s = scope(store.id);
+    const id = toInt(req.params.id);
+    if (!await s.get('delivery_zones', { id })) notFound('المنطقة غير موجودة');
+
+    const body = await readBody(req);
+    const patch = {};
+    if (body.name     !== undefined) patch.name      = clean(body.name, 60);
+    if (body.fee      !== undefined) patch.fee       = Math.max(0, toInt(body.fee));
+    if (body.freeOver !== undefined) patch.free_over = Math.max(0, toInt(body.freeOver));
+    if (body.sort     !== undefined) patch.sort      = toInt(body.sort);
+
+    await s.update('delivery_zones', id, patch);
+    json(res, { ok: true, zone: await s.get('delivery_zones', { id }) });
+  });
+
+  r.delete('/api/me/zones/:id', async (req, res) => {
+    const { store } = await requireStore(req);
+    // الطلبات القديمة تحتفظ بـzone_name نصّاً، فحذف المنطقة
+    // لا يمحو ما دفعه العميل فعلاً في طلب مضى
+    const n = await scope(store.id).remove('delivery_zones', toInt(req.params.id));
+    if (!n) notFound('المنطقة غير موجودة');
+    json(res, { ok: true });
+  });
+
+  // ── العملاء ───────────────────────────────────────────
+  //  ★ الإحصاءات تُحسب بالاستعلام ولا تُخزَّن: العدّاد المخزَّن
+  //  ينحرف عند كل إلغاء، وانحرافه صامت — التاجر يرى رقماً
+  //  خاطئاً ولا شيء يكسر لينبّهه.
+  r.get('/api/me/customers', async (req, res) => {
+    const { store } = await requireStore(req);
+    const s = scope(store.id);
+
+    const rows = await s.raw(
+      `SELECT c.id, c.phone, c.name, c.address, c.first_at, c.last_at,
+              COUNT(o.id)::int AS orders_count,
+              COALESCE(SUM(CASE WHEN o.status IN ('ok','done') THEN o.total ELSE 0 END), 0)::int AS spent,
+              MAX(o.created_at) AS last_order
+         FROM customers c
+         LEFT JOIN orders o ON o.customer_id = c.id AND o.store_id = c.store_id
+        WHERE c.store_id = ?
+        GROUP BY c.id
+        ORDER BY c.last_at DESC
+        LIMIT 300`,
+      [store.id],
+    );
+
+    json(res, {
+      customers: rows,
+      total: await s.count('customers', {}),
+      // العائدون هم الحجّة البيعية الحقيقية للتاجر
+      returning: rows.filter((c) => c.orders_count > 1).length,
+    });
+  });
+
+  // ═══ التقييمات ════════════════════════════════════════
+  //  التاجر لا يحذف ولا يعدّل نصّ عميل — يُخفي ويردّ فقط.
+  //  حذفُ رأيٍ يجعل التقييمات دعايةً؛ والإخفاء يترك الصفّ
+  //  في القاعدة فيبقى للإدارة ما تحتكم إليه عند النزاع.
+  r.get('/api/me/reviews', async (req, res) => {
+    const { store } = await requireStore(req);
+    const s = scope(store.id);
+
+    const per  = Math.min(100, Math.max(1, toInt(req.query.get('per'), 50)));
+    const page = Math.max(1, toInt(req.query.get('page'), 1));
+
+    // المرشِّحات تخدم عملَ التاجر لا فضوله: «بلا ردّ» و«منخفض»
+    // هما ما يفتح عليهما لوحته صباحاً
+    const where = ['r.store_id = ?'];
+    const params = [store.id];
+    const f = req.query.get('filter') ?? '';
+    if (f === 'hidden')     where.push('r.hidden = 1');
+    else if (f === 'low')   where.push('r.rating <= 2 AND r.hidden = 0');
+    else if (f === 'unanswered') where.push("r.reply = '' AND r.hidden = 0");
+    else if (f === 'visible')    where.push('r.hidden = 0');
+
+    const pid = toInt(req.query.get('product'), 0);
+    if (pid) { where.push('r.product_id = ?'); params.push(pid); }
+
+    const clause = where.join(' AND ');
+    const total = (await s.raw(
+      `SELECT COUNT(*)::int n FROM product_reviews r WHERE ${clause}`, params))[0].n;
+
+    const rows = await s.raw(`
+      SELECT r.*, p.name product_name, p.image product_image
+        FROM product_reviews r
+        JOIN products p ON p.id = r.product_id AND p.store_id = r.store_id
+       WHERE ${clause}
+       ORDER BY r.created_at DESC, r.id DESC
+       LIMIT ? OFFSET ?`, [...params, per, (page - 1) * per]);
+
+    json(res, {
+      reviews: rows.map((r) => ({
+        id: r.id,
+        productId: r.product_id,
+        productName: r.product_name,
+        productImage: r.product_image,
+        rating: r.rating,
+        name: r.name || 'زائر',
+        body: r.body,
+        verified: !!r.verified,
+        hidden: !!r.hidden,
+        reply: r.reply,
+        replyAt: r.reply_at,
+        createdAt: r.created_at,
+      })),
+      total, page, per,
+      pages: Math.max(1, Math.ceil(total / per)),
+      summary: await storeSummary(store.id),
+    });
+  });
+
+  r.patch('/api/me/reviews/:id', async (req, res) => {
+    const { store } = await requireStore(req);
+    const s = scope(store.id);
+    const id = toInt(req.params.id);
+
+    const row = await s.get('product_reviews', { id });
+    if (!row) notFound('التقييم غير موجود');
+
+    const body = await readBody(req);
+    const patch = {};
+    if (body.hidden !== undefined) patch.hidden = body.hidden ? 1 : 0;
+    if (body.reply !== undefined) {
+      patch.reply = clean(body.reply, 600);
+      // مسح الردّ يمسح تاريخه — ردٌّ فارغ بتاريخ يربك اللوحة
+      patch.reply_at = patch.reply ? now() : null;
+    }
+    if (!Object.keys(patch).length) bad('لا يوجد تغيير');
+
+    await s.update('product_reviews', id, patch);
+    json(res, { ok: true, review: await s.get('product_reviews', { id }) });
   });
 
   // ── المنتجات ──────────────────────────────────────────
@@ -252,6 +443,7 @@ export default async function register(r) {
       plan: planOf(store),
       addons: ADDONS,
       skins: Object.values(SKINS),     // الاختيار يُفرض بالباقة في الخادم
+      layouts: Object.values(LAYOUTS), // وكذلك القوالب
     });
   });
 
@@ -270,7 +462,9 @@ export default async function register(r) {
     if (body.banner  !== undefined) patch.banner  = await saveImage(store.id, 'banner', body.banner);
     // §٣.٤ — صورة العرض: ثانية غير الغلاف، تعيش في «قصة المتجر»
     if (body.showcase !== undefined) patch.showcase = await saveImage(store.id, 'showcase', body.showcase);
-    if (body.sector  !== undefined) patch.sector  = clean(body.sector, 30);
+    // قطاع لا نعرفه يُتجاهَل بدل حفظه: القيمة تُعرض فوق واجهة
+    // المتجر، وقيمةٌ خارج القائمة تُطبع خاماً أو لا تُطبع أصلاً
+    if (isSector(body.sector)) patch.sector = body.sector;
 
     if (body.color     !== undefined && HEX.test(body.color))     patch.color = body.color;
     if (body.colorDeep !== undefined && HEX.test(body.colorDeep))  patch.color_deep = body.colorDeep;
@@ -286,13 +480,47 @@ export default async function register(r) {
       patch.theme = theme;
     }
 
-    // رسوم التوصيل — يحدّدها كل تاجر لمدينته
+    // §٢.١ — القالب الثاني ميزة برو كالسكِنات، والرفض صريح:
+    // تاجرٌ يظن أن قالبه تغيّر ثم يفتح متجره فلا يجده أسوأ من منع.
+    if (body.layout !== undefined) {
+      const layout = clean(body.layout, 20);
+      if (!LAYOUTS[layout]) bad('قالب غير معروف');
+      if (layout !== 'signature' && !planOf(store).extraThemes) {
+        bad(`القوالب الإضافية متاحة في باقة ${PLANS.pro.name}`, 'PLAN_LIMIT');
+      }
+      patch.layout = layout;
+    }
+
+    // رسوم التوصيل — يحدّدها كل تاجر لمدينته.
+    // تبقى كسقوط آمن حتى بعد تعريف المناطق: متجر يحذف مناطقه
+    // كلها يجب أن يعود إلى رسم واحد لا إلى توصيل مجاني بالخطأ.
     if (body.deliveryFee      !== undefined) patch.delivery_fee       = Math.max(0, toInt(body.deliveryFee));
     if (body.deliveryFreeOver !== undefined) patch.delivery_free_over = Math.max(0, toInt(body.deliveryFreeOver));
     if (body.deliveryNote     !== undefined) patch.delivery_note      = clean(body.deliveryNote, 200);
 
+    // طرق الدفع وتعليمات التحويل — لا بوابة ولا عمولة
+    if (body.payNote !== undefined) patch.pay_note = clean(body.payNote, 400);
+    if (body.payMethods !== undefined) {
+      const picked = (Array.isArray(body.payMethods) ? body.payMethods : [])
+        .map((m) => String(m).trim())
+        .filter((m) => PAY_METHODS[m]);
+      // «عند الاستلام» لا يُنزع أبداً: متجر بلا طريقة دفع واحدة
+      // لا يستطيع استقبال طلب، والخطأ صامت حتى يشتكي عميل
+      patch.pay_methods = (picked.length ? picked : ['cod']).join(',');
+    }
+
+    // الدولة تُقرأ قبل رقم واتساب: من يغيّر دولته في الطلب نفسه
+    // يجب أن يُفهَم رقمه المحلي بالدولة الجديدة لا القديمة
+    const country = body.country !== undefined
+      ? String(body.country).toUpperCase()
+      : (store.country || DEFAULT_COUNTRY);
+    if (body.country !== undefined) {
+      if (!COUNTRIES[country]) bad('دولة غير مدعومة');
+      patch.country = country;
+    }
+
     if (body.whatsapp !== undefined) {
-      const w = normalizePhone(body.whatsapp);
+      const w = normalizePhone(body.whatsapp, country);
       if (!validPhone(w)) bad('رقم واتساب غير صحيح');
       patch.whatsapp = w;
     }
@@ -579,6 +807,16 @@ export function effectiveTheme(s) {
   return planOf(s).extraThemes && SKINS[theme] ? theme : 'signature';
 }
 
+/**
+ * القالب **الفعّال** — مرآة effectiveTheme للمحور الآخر.
+ * الهبوط من برو يعيد الواجهة إلى «التوقيع» ويُبقي الاختيار في
+ * القاعدة، فيسترجعه التاجر لحظة الترقية بلا أن يعيد ضبطه.
+ */
+export function effectiveLayout(s) {
+  const layout = s.layout || 'signature';
+  return planOf(s).extraThemes && LAYOUTS[layout] ? layout : 'signature';
+}
+
 export function publicStore(s) {
   return {
     id: s.id, slug: s.slug, name: s.name, sector: s.sector,
@@ -587,11 +825,18 @@ export function publicStore(s) {
     showcase: s.showcase ?? '',
     color: s.color, colorDeep: s.color_deep,
     theme: effectiveTheme(s), savedTheme: s.theme || 'signature',
+    layout: effectiveLayout(s), savedLayout: s.layout || 'signature',
     plan: s.plan, verified: !!s.verified, status: s.status,
     createdAt: s.created_at,
+    // الدولة تُحفظ، والعملة **تُشتقّ منها** ولا تُحفظ: عمودان
+    // منفصلان يسمحان بمتجر في مصر يعرض أسعاره بالريال اليمني
+    country: s.country || DEFAULT_COUNTRY,
+    currency: symbolOf(s.country),
     deliveryFee: s.delivery_fee ?? 0,
     deliveryFreeOver: s.delivery_free_over ?? 0,
     deliveryNote: s.delivery_note ?? '',
+    payMethods: s.pay_methods ?? 'cod',
+    payNote: s.pay_note ?? '',
     url: `/${s.slug}`,
   };
 }

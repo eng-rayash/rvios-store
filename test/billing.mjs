@@ -1,7 +1,7 @@
 // اختبار نظام الفوترة (§٥)
 import fs from 'node:fs';
 import { finish } from './finish.mjs';
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 

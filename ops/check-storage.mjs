@@ -6,8 +6,8 @@
 //
 //  لا يطبع أي مفتاح — الأطوال فقط، ليُميَّز الناقص من الخاطئ.
 // ═══════════════════════════════════════════════════════════
-import { config } from '../src/config.js';
-import { put, get, dropPrefix, driver } from '../src/storage.js';
+import { config } from '../server/config.js';
+import { put, get, dropPrefix, driver } from '../server/storage.js';
 
 const mask = (v) => (v ? `مضبوط (${v.length} محرفاً)` : '✖ غائب');
 const line = (k, v) => console.log(`  ${k.padEnd(24)} ${v}`);

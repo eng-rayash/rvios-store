@@ -5,7 +5,7 @@
 //   ١) products.qty يساوي دائماً مجموع كميات الخيارات
 //   ٢) المخزون يُخصم من الخيار المطلوب وحده لا من أخيه
 //   ٣) الإلغاء يعيد الكمية إلى الخيار نفسه
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 

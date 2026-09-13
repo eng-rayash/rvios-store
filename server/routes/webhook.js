@@ -33,8 +33,12 @@ function validSignature(raw, header) {
   return crypto.timingSafeEqual(a, b);
 }
 
-/** ٩٦٧٧٧٧… ← ٧٧٧… ليطابق ما نخزّنه محلياً */
-const local = (intl) => String(intl ?? '').replace(/^967/, '');
+/**
+ * Meta ترسل الرقم بصيغة E.164 بلا زائد — وهي الصيغة نفسها التي
+ * نخزّنها منذ هجرة الأرقام، فلم يعد يلزم قصّ رمز الدولة.
+ * كان القصّ يطابق اليمن وحدها، فيفشل تتبّع التسليم لأي رقم آخر.
+ */
+const local = (intl) => String(intl ?? '');
 
 export default function register(r) {
 

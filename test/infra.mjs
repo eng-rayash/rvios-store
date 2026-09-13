@@ -7,7 +7,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { finish } from './finish.mjs';
 
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 
@@ -50,9 +50,9 @@ const size = async (url, enc) => {
 };
 {
   // fetch يفكّ الضغط تلقائياً، فنقيس عبر ترويسة الطول المُعلنة
-  const plain = await fetch(B + '/', { headers: { 'accept-encoding': 'identity' } });
-  const brot  = await fetch(B + '/', { headers: { 'accept-encoding': 'br' } });
-  const gz    = await fetch(B + '/', { headers: { 'accept-encoding': 'gzip' } });
+  const plain = await fetch(B + '/login', { headers: { 'accept-encoding': 'identity' } });
+  const brot  = await fetch(B + '/login', { headers: { 'accept-encoding': 'br' } });
+  const gz    = await fetch(B + '/login', { headers: { 'accept-encoding': 'gzip' } });
 
   ok(!plain.headers.get('content-encoding'), 'identity يُخدم بلا ضغط');
   ok(brot.headers.get('content-encoding') === 'br', 'brotli يُفضَّل حين يُقبل');
@@ -79,8 +79,8 @@ const size = async (url, enc) => {
 }
 
 console.log('\n── النسخ الاحتياطي ──');
-const { backupNow, listBackups } = await import('../src/backup.js');
-const { config } = await import('../src/config.js');
+const { backupNow, listBackups } = await import('../server/backup.js');
+const { config } = await import('../server/config.js');
 {
   const before = listBackups().length;
   const info = await backupNow('test');
@@ -126,7 +126,7 @@ console.log('\n── حارس الإعداد ──');
   // إقلاع إنتاجي بكلمة المرور الافتراضية يجب أن يفشل
   let blocked = false, output = '';
   try {
-    execFileSync(process.execPath, ['--no-warnings', 'src/server.js'], {
+    execFileSync(process.execPath, ['--no-warnings', 'server/server.js'], {
       cwd: config.paths.root,
       env: { ...process.env, NODE_ENV: 'production', RVIOS_ADMIN_PASS: 'rvios-admin', PORT: '3998' },
       timeout: 20000, stdio: 'pipe',
@@ -139,14 +139,14 @@ console.log('\n── حارس الإعداد ──');
   ok(/RVIOS_ADMIN_PASS/.test(output), 'الخطأ يسمّي المتغيّر المطلوب');
 }
 {
-  const { validateConfig } = await import('../src/config.js');
+  const { validateConfig } = await import('../server/config.js');
   const v = validateConfig();
   ok(v.ok, 'إعداد التطوير الحالي سليم');
 }
 
 console.log('\n── العزل ما يزال قائماً ──');
 {
-  const { TENANT_TABLES } = await import('../src/tenancy.js');
+  const { TENANT_TABLES } = await import('../server/tenancy.js');
   ok(TENANT_TABLES.has('orders') && TENANT_TABLES.has('invoices'),
     'جداول المستأجرين محروسة');
   ok(!TENANT_TABLES.has('wa_messages'),

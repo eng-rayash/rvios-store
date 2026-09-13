@@ -145,6 +145,37 @@ tbody tr:hover{background:var(--cream)}
 .skin em{display:block;font-style:normal;font-size:var(--fs-xs);font-weight:800;padding:8px 10px 2px}
 .skin small{display:block;font-size:var(--fs-2xs);color:var(--soft);padding:0 10px 9px;line-height:1.5}
 
+/* اختيار القالب (برو) — المحور الثاني بجوار السكِن.
+   الشكل نفسه عمداً: قراران متجاوران يجب أن يبدوا من عائلة
+   واحدة. والفرق في المصغّرة: مربّعات مقابل خلايا طولية. */
+.layouts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.layout{border:1.5px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--paper);
+  text-align:start;transition:border-color .25s,transform .25s var(--ease),box-shadow .25s}
+.layout:hover:not(:disabled){transform:translateY(-2px);box-shadow:var(--shadow)}
+.layout.on{border-color:var(--shop);border-width:2px}
+.layout:disabled{opacity:.5;cursor:not-allowed}
+.layout em{display:block;font-style:normal;font-size:var(--fs-xs);font-weight:800;padding:8px 10px 2px}
+.layout small{display:block;font-size:var(--fs-2xs);color:var(--soft);padding:0 10px 9px;line-height:1.5}
+.layout .mini{height:64px;padding:7px;display:flex;flex-direction:column;gap:5px}
+.layout .mini .bar{border-radius:var(--r-sm);background:var(--shop);flex-shrink:0}
+.layout .mini .row{flex-grow:1;display:grid;gap:5px}
+.layout .mini .row i{border-radius:var(--r-sm);background:var(--sand)}
+/* التوقيع: شريط رفيع وخليتان مربّعتان */
+.layout .m-signature .bar{height:12px}
+.layout .m-signature .row{grid-template-columns:1fr 1fr}
+.layout .m-signature .row i:last-child{display:none}
+/* أتولييه: هيرو عالٍ وثلاث خلايا طولية */
+.layout .m-atelier .bar{height:24px}
+.layout .m-atelier .row{grid-template-columns:repeat(3,1fr)}
+
+/* المعاينة تعلن القالب: بطاقات طولية بدل مربّعة — وهذا كل
+   ما نَعِد به هنا، فلا نرسم هيرو أو مقاسات لا تُنفَّذ. */
+.prev[data-layout="atelier"] .pv-shot{height:76px}
+.prev[data-layout="atelier"] .pv-card{text-align:start;background:var(--cream);border-color:transparent;padding:0 0 7px}
+.prev[data-layout="atelier"] .pv-card em{padding:6px 2px 0}
+.prev[data-layout="atelier"] .pv-card b{padding:0 2px}
+.prev[data-layout="atelier"] .pv-btn{background:none;border:1px solid var(--ink);color:var(--ink)}
+
 /* ── معاينة واجهة المتجر ──────────────────────────────────
    العنصر يحمل لوحة التاجر كاملة في style الخاص به، فيتغيّر
    كل ما فيه لحظة اختيار اللون بينما تبقى اللوحة على هوية
@@ -323,3 +354,48 @@ tbody tr:hover{background:var(--cream)}
   .vaxes{grid-template-columns:1fr}
   .vrow,.vrow.two,.vgrid.two .vrow{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 26px}
 }
+
+/* ═══ التقييمات ═══════════════════════════════════════════ */
+.dstars{display:inline-flex;gap:1.5px;line-height:0;vertical-align:middle}
+.dstars svg{width:13px;height:13px;fill:var(--line)}
+.dstars svg.on{fill:var(--brass,#C6A15B)}
+
+.drev{padding:14px 0;border-bottom:1px solid var(--line)}
+.drev:last-child{border-bottom:none}
+.drev.off{opacity:.55}
+.drev-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.drev-h b{font-size:13.5px}
+.drev-p{font-size:12px;color:var(--soft);
+  background:var(--sand,rgba(0,0,0,.04));padding:2px 8px;border-radius:99px}
+.drev-h time{font-size:12px;color:var(--soft);margin-inline-start:auto}
+.drev>p{font-size:13.5px;line-height:1.75}
+.drev>p.muted{color:var(--soft);font-style:italic}
+.drev-r{margin-top:8px;padding:9px 12px;border-radius:8px;
+  background:var(--sand,rgba(0,0,0,.04));border-inline-start:2.5px solid var(--shop)}
+.drev-r b{display:block;font-size:12px;color:var(--shop);margin-bottom:3px}
+.drev-r p{font-size:13px;line-height:1.7}
+.drev-a{display:flex;gap:7px;margin-top:10px}
+
+/* ═══ ملفّ المتجر في لوحة الإدارة ═════════════════════════ */
+.dim{position:fixed;inset:0;background:rgba(36,31,27,.5);z-index:105;
+  backdrop-filter:blur(2px)}
+.sheet.wide{width:min(860px,95vw)}
+.dhead{display:flex;align-items:center;justify-content:space-between;
+  gap:12px;margin-bottom:16px}
+.dhead h2{margin-bottom:0}
+.drow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+
+.dstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
+  gap:10px;margin-bottom:20px}
+.dstat{background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:11px 13px}
+.dstat span{display:block;font-size:11.5px;color:var(--soft);margin-bottom:3px}
+.dstat b{font-family:var(--display);font-size:20px;font-weight:700}
+
+.dh{font-family:var(--display);font-size:19px;font-weight:700;
+  margin:22px 0 11px;padding-top:14px;border-top:1px solid var(--line)}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:11px}
+.dgrid > div{background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:9px 12px}
+.dgrid span{display:block;font-size:11.5px;color:var(--soft);margin-bottom:2px}
+.dgrid b{font-size:13.5px;font-weight:700;word-break:break-word}

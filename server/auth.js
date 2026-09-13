@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { db, now } from './db.js';
 import { HttpError, parseCookies } from './http.js';
 import { deliverOtp, DEV_SHOWS_CODE } from './notify.js';
+import { toE164, validE164 } from './countries.js';
 import { config } from './config.js';
 
 export const DEV = !config.isProd;
@@ -30,24 +31,35 @@ export const ADMIN_COOKIE   = 'rvios_admin';
  */
 export const ADMIN_PASS = config.admin.password;
 
-// ── رقم الجوال اليمني ────────────────────────────────────
-export function normalizePhone(input) {
-  // يحوّل الأرقام العربية-الهندية إلى لاتينية ثم ينظّف
-  const latin = String(input ?? '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-  let p = latin.replace(/[^\d+]/g, '');
-  if (p.startsWith('+')) p = p.slice(1);
-  if (p.startsWith('00')) p = p.slice(2);
-  if (p.startsWith('967')) p = p.slice(3);
-  if (p.startsWith('0')) p = p.slice(1);
-  return p;
+// ── رقم الجوال ───────────────────────────────────────────
+/**
+ * يوحّد أي صيغة يكتبها المستخدم إلى **E.164 بلا علامة زائد**.
+ *
+ * كان يُسقط رمز اليمن ويحتفظ بتسعة أرقام محلية، فيستحيل أن
+ * يسجّل تاجر من خارج اليمن. وصار يحفظ الرقم كاملاً برمز دولته،
+ * فيصير المفتاح فريداً عالمياً — ورقم أردني وآخر يمني بالأرقام
+ * نفسها لم يعودا يتصادمان على مفتاح `merchants.phone` الفريد.
+ *
+ * @param {string} input
+ * @param {string} [country] الدولة المفترضة حين لا يُكتب رمز
+ */
+export function normalizePhone(input, country) {
+  return toE164(input, country);
 }
 
 export function validPhone(p) {
-  // يمني: ٧٧/٧٣/٧١/٧٠ + ٧ أرقام، أو أرضي ١-٧ أرقام
-  return /^7[0137]\d{7}$/.test(p);
+  return validE164(p);
 }
 
-export const intlPhone = (p) => `967${p}`;
+/**
+ * الرقم بالصيغة الدولية.
+ *
+ * صارت هويةً لا تحويلاً: الأرقام تُخزَّن E.164 منذ هجرة
+ * `ops/migrate-phones.mjs`، فلا يُركَّب رمز الدولة مرتين.
+ * الدالة باقية لأن عشرة مواضع تستدعيها، ونيّتها أوضح من
+ * تمرير الحقل عارياً.
+ */
+export const intlPhone = (p) => String(p ?? '');
 
 // ── الرموز ───────────────────────────────────────────────
 

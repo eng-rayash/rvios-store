@@ -131,6 +131,7 @@ async function loadStores(q = '') {
         ${s.reports ? `<span class="badge b-wait" style="margin-inline-start:4px">${AR(s.reports)} بلاغ</span>` : ''}
       </td>
       <td><div class="acts-cell">
+        <button class="btn btn-line btn-sm" data-store="${s.id}">التفاصيل</button>
         <button class="btn btn-line btn-sm" data-verify="${s.id}" data-to="${s.verified ? 0 : 1}">
           ${s.verified ? 'سحب التوثيق' : 'توثيق'}
         </button>
@@ -141,6 +142,212 @@ async function loadStores(q = '') {
       </div></td>
     </tr>`).join('')
     : `<tr><td colspan="7"><div class="empty"><p>لا توجد متاجر مطابقة.</p></div></td></tr>`;
+}
+
+// ═══ التجار ══════════════════════════════════════════════
+//  جدول المتاجر يعرض صفاً لكل متجر؛ هذه الشاشة تعرض صفاً لكل
+//  إنسان. القرارات التي تخص شخصاً — توثيقه أو رفضه أو منحه
+//  خانة متجر — تُتّخذ هنا لا هناك.
+
+let kycFilter = '';
+
+const KYC_BADGE = {
+  approved: ['b-ok',   'موثَّق'],
+  pending:  ['b-wait', 'بانتظار المراجعة'],
+  rejected: ['b-off',  'مرفوض'],
+  none:     ['',       'بلا بيانات'],
+};
+
+async function loadMerchants(q = '') {
+  const p = new URLSearchParams();
+  if (q) p.set('q', q);
+  if (kycFilter) p.set('kyc', kycFilter);
+  const d = await api.get(`/api/admin/merchants${p.toString() ? `?${p}` : ''}`);
+
+  // الشارة تعدّ ما ينتظر قراراً — لا كل التجار
+  const pill = $('#kycPill');
+  if (pill) { pill.hidden = !d.counts.pending; pill.textContent = AR(d.counts.pending ?? 0); }
+
+  $('#merchRows').innerHTML = d.merchants.length ? d.merchants.map((m) => {
+    const [cls, label] = KYC_BADGE[m.kyc.status] ?? KYC_BADGE.none;
+    return `<tr>
+      <td>
+        <b>${escapeHtml(m.fullName || m.name || '—')}</b>
+        ${m.nationalId ? `<br><small style="color:var(--soft);direction:ltr">هوية: ${escapeHtml(m.nationalId)}</small>` : ''}
+      </td>
+      <td>
+        <small style="direction:ltr;display:block">${escapeHtml(m.phone)}</small>
+        ${m.email
+          ? `<small style="direction:ltr;color:var(--soft)">${escapeHtml(m.email)}${
+              m.emailVerified ? ' <span class="badge b-ok" style="font-size:10px">موثَّق</span>' : ''}</small>`
+          : '<small style="color:var(--soft)">بلا بريد</small>'}
+      </td>
+      <td>${escapeHtml(m.businessTypeLabel || '—')}<br>
+          <small style="color:var(--soft)">${escapeHtml(m.city || '—')}</small></td>
+      <td>${AR(m.stores)}${m.paidStores ? ` <span class="badge b-done" style="font-size:10px">${AR(m.paidStores)} مدفوع</span>` : ''}
+          <br><small style="color:var(--soft)">${AR(m.slots)} خانة</small></td>
+      <td><span class="badge ${cls}">${label}</span>
+        ${m.kyc.note ? `<br><small style="color:var(--soft)">${escapeHtml(m.kyc.note)}</small>` : ''}</td>
+      <td><div class="acts-cell">
+        ${m.kyc.status !== 'approved'
+          ? `<button class="btn btn-line btn-sm" data-kyc="${m.id}" data-to="approved" style="color:var(--ok)">اعتماد</button>` : ''}
+        ${m.kyc.status !== 'rejected'
+          ? `<button class="btn btn-line btn-sm" data-kyc="${m.id}" data-to="rejected" style="color:var(--danger)">رفض</button>` : ''}
+        <button class="btn btn-line btn-sm" data-slots="${m.id}" data-now="${m.slots}">خانات</button>
+      </div></td>
+    </tr>`;
+  }).join('')
+    : `<tr><td colspan="6"><div class="empty"><p>لا تجار مطابقون.</p></div></td></tr>`;
+}
+
+// ═══ الاشتراكات ══════════════════════════════════════════
+let subFilter = '';
+
+const SUB_BADGE = {
+  active:  ['b-ok',   'نشط'],
+  grace:   ['b-wait', 'في المهلة'],
+  expired: ['b-off',  'منتهٍ'],
+};
+
+/** كم بقي؟ رقمٌ يُقرأ بنظرة أنفع من تاريخ يحتاج حساباً */
+function daysLeft(iso) {
+  if (!iso) return null;
+  return Math.ceil((new Date(iso) - Date.now()) / 86400000);
+}
+
+async function loadSubs() {
+  const d = await api.get(`/api/admin/subscriptions${subFilter ? `?filter=${subFilter}` : ''}`);
+  const c = d.counts;
+
+  $('#subSum').textContent =
+    `${AR(c.paid)} مدفوع · ${AR(c.soon)} ينتهي خلال أسبوع · ${AR(c.expired)} منتهٍ`;
+  const pill = $('#subPill');
+  if (pill) { pill.hidden = !c.soon; pill.textContent = AR(c.soon); }
+
+  $('#subRows').innerHTML = d.subscriptions.length ? d.subscriptions.map((s) => {
+    const [cls, label] = SUB_BADGE[s.status] ?? ['', s.status];
+    const left = daysLeft(s.current_period_end);
+    return `<tr>
+      <td><b>${escapeHtml(s.store_name)}</b>
+        <br><small><a href="/${encodeURIComponent(s.slug)}" target="_blank" rel="noopener"
+             style="color:var(--shop)">/${escapeHtml(s.slug)}</a></small></td>
+      <td>${escapeHtml(s.owner_name || '—')}
+        <br><small style="color:var(--soft);direction:ltr">${escapeHtml(s.owner_phone)}</small></td>
+      <td><span class="badge b-done">${PLAN_NAMES[s.plan] ?? s.plan}</span></td>
+      <td><span class="badge ${cls}">${label}</span>
+        ${s.pending_invoices ? `<br><span class="badge b-wait" style="font-size:10px">${AR(s.pending_invoices)} إيصال</span>` : ''}</td>
+      <td>${s.current_period_end
+        ? `${when(s.current_period_end)}<br><small style="color:${left <= 7 ? 'var(--danger)' : 'var(--soft)'}">${
+            left < 0 ? `مضى ${AR(-left)} يوماً` : `بقي ${AR(left)} يوماً`}</small>`
+        : '<span style="color:var(--soft)">—</span>'}</td>
+      <td><span class="money">${AR(s.paid_total)}</span></td>
+      <td><div class="acts-cell">
+        <button class="btn btn-line btn-sm" data-extend="${s.id}">مدّد</button>
+        <button class="btn btn-line btn-sm" data-store="${s.store_id}">التفاصيل</button>
+      </div></td>
+    </tr>`;
+  }).join('')
+    : `<tr><td colspan="7"><div class="empty"><p>لا اشتراكات في هذا التصنيف.</p></div></td></tr>`;
+}
+
+// ═══ ملفّ متجر ═══════════════════════════════════════════
+//  خمسة نداءات تعني خمس شاشات وقراراً على ربع صورة. هذا
+//  النداء الواحد يجمع التاجر والاشتراك والفواتير والبلاغات.
+
+function openSheet(on) {
+  $('#detail').classList.toggle('on', on);
+  $('#dim').hidden = !on;
+  document.body.style.overflow = on ? 'hidden' : '';
+}
+
+async function openStore(id) {
+  openSheet(true);
+  $('#dBody').innerHTML = '<p style="color:var(--soft);padding:20px 0">…</p>';
+  let d;
+  try { d = await api.get(`/api/admin/stores/${id}`); }
+  catch (e) { $('#dBody').innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`; return; }
+
+  const { store: s, merchant: m, subscription: sub, counts, reviews } = d;
+  const [kcls, klabel] = KYC_BADGE[m.kyc.status] ?? KYC_BADGE.none;
+  $('#dTitle').textContent = s.name;
+
+  const stat = (label, value) => `<div class="dstat"><span>${label}</span><b>${value}</b></div>`;
+
+  $('#dBody').innerHTML = `
+    <div class="drow">
+      <span class="badge ${s.status === 'active' ? 'b-ok' : 'b-off'}">${s.status === 'active' ? 'نشط' : 'موقوف'}</span>
+      ${s.verified ? '<span class="badge b-ok">موثّق</span>' : ''}
+      <span class="badge b-done">${PLAN_NAMES[s.plan] ?? s.plan}</span>
+      <a href="/${encodeURIComponent(s.slug)}" target="_blank" rel="noopener"
+         style="color:var(--shop);font-size:13px">/${escapeHtml(s.slug)} ↗</a>
+    </div>
+
+    <div class="dstats">
+      ${stat('منتجات', AR(counts.products))}
+      ${stat('طلبات', AR(counts.orders))}
+      ${stat('عملاء', AR(counts.customers))}
+      ${stat('مبيعات', AR(counts.revenue))}
+      ${stat('تقييم', reviews.count ? `${reviews.average.toFixed(1)} (${AR(reviews.count)})` : '—')}
+    </div>
+
+    <h3 class="dh">التاجر</h3>
+    <div class="dgrid">
+      <div><span>الاسم</span><b>${escapeHtml(m.fullName || m.name || '—')}</b></div>
+      <div><span>الجوال</span><b dir="ltr">${escapeHtml(m.phone)}</b></div>
+      <div><span>البريد</span><b dir="ltr">${escapeHtml(m.email || '—')}
+        ${m.emailVerified ? '<span class="badge b-ok" style="font-size:10px">موثَّق</span>' : ''}</b></div>
+      <div><span>الهوية</span><b dir="ltr">${escapeHtml(m.nationalId || '—')}</b></div>
+      <div><span>النشاط</span><b>${escapeHtml(m.businessTypeLabel || '—')}</b></div>
+      <div><span>المدينة</span><b>${escapeHtml(m.city || '—')}</b></div>
+      <div><span>العنوان</span><b>${escapeHtml(m.address || '—')}</b></div>
+      <div><span>التحقق</span><b><span class="badge ${kcls}">${klabel}</span></b></div>
+    </div>
+
+    ${d.siblings.length > 1 ? `
+      <h3 class="dh">متاجره الأخرى</h3>
+      <div class="drow">${d.siblings.filter((x) => x.id !== s.id).map((x) => `
+        <button class="btn btn-line btn-sm" data-store="${x.id}">${escapeHtml(x.name)}</button>`).join('')}</div>` : ''}
+
+    <h3 class="dh">الاشتراك</h3>
+    ${sub ? `<div class="dgrid">
+      <div><span>الحالة</span><b>${(SUB_BADGE[sub.status] ?? ['', sub.status])[1]}</b></div>
+      <div><span>الباقة</span><b>${PLAN_NAMES[sub.plan] ?? sub.plan}</b></div>
+      <div><span>ينتهي</span><b>${sub.current_period_end ? when(sub.current_period_end) : '—'}</b></div>
+    </div>
+    <div class="drow" style="margin-top:10px">
+      <button class="btn btn-line btn-sm" data-extend="${sub.id}">مدّد الاشتراك</button>
+    </div>` : '<p style="color:var(--soft);font-size:13px">لا صف اشتراك لهذا المتجر.</p>'}
+
+    ${d.invoices.length ? `
+      <h3 class="dh">الفواتير</h3>
+      <table><thead><tr><th>المرجع</th><th>النوع</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+      <tbody>${d.invoices.slice(0, 10).map((i) => `<tr>
+        <td dir="ltr">${escapeHtml(i.ref)}</td><td>${escapeHtml(i.kind)}</td>
+        <td><span class="money">${AR(i.amount)}</span></td>
+        <td>${escapeHtml(i.status)}</td>
+        <td style="color:var(--soft);font-size:12.5px">${when(i.created_at)}</td></tr>`).join('')}</tbody></table>` : ''}
+
+    ${d.recentOrders.length ? `
+      <h3 class="dh">آخر الطلبات</h3>
+      <table><thead><tr><th>المرجع</th><th>العميل</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+      <tbody>${d.recentOrders.map((o) => `<tr>
+        <td dir="ltr">${escapeHtml(o.ref)}</td><td>${escapeHtml(o.cust_name || '—')}</td>
+        <td><span class="money">${AR(o.total)}</span></td>
+        <td>${escapeHtml(o.status)}</td></tr>`).join('')}</tbody></table>` : ''}
+
+    ${d.reports.length ? `
+      <h3 class="dh">البلاغات (${AR(d.reports.length)})</h3>
+      ${d.reports.slice(0, 5).map((r) => `
+        <p style="font-size:13px;padding:7px 0;border-bottom:1px solid var(--line)">
+          ${escapeHtml(r.reason)} <small style="color:var(--soft)">· ${when(r.created_at)}</small></p>`).join('')}` : ''}
+
+    ${d.audit.length ? `
+      <h3 class="dh">سجل التدقيق</h3>
+      ${d.audit.slice(0, 8).map((a) => `
+        <p style="font-size:12.5px;color:var(--soft);padding:4px 0">
+          <b style="color:var(--ink)">${escapeHtml(a.action)}</b> · ${escapeHtml(a.actor)} · ${when(a.created_at)}
+          ${a.detail ? ` — ${escapeHtml(a.detail)}` : ''}</p>`).join('')}` : ''}
+  `;
 }
 
 // ═══ البلاغات (§٦.٢) ═════════════════════════════════════
@@ -180,7 +387,7 @@ async function loadRequests() {
         ${r.detail ? `<div style="font-size:12.5px;color:var(--soft);margin-top:6px;line-height:1.8">${escapeHtml(r.detail)}</div>` : ''}
       </div>
       ${r.status === 'open' ? `
-        <a class="btn btn-wa btn-sm" href="https://wa.me/967${escapeHtml(r.contact)}" target="_blank" rel="noopener">واتساب</a>
+        <a class="btn btn-wa btn-sm" href="https://wa.me/${escapeHtml(r.contact)}" target="_blank" rel="noopener">واتساب</a>
         <button class="btn btn-fill btn-sm" data-req="${r.id}" data-to="done">
           ${r.kind === 'verify' ? 'اقبل ووثّق' : 'تم الإنجاز'}
         </button>
@@ -304,7 +511,8 @@ async function loadPlans() {
 
 // ═══ الأحداث ═════════════════════════════════════════════
 function wire() {
-  const TITLES = { stats: 'الإحصائيات', stores: 'المتاجر', reports: 'البلاغات',
+  const TITLES = { stats: 'الإحصائيات', stores: 'المتاجر', merchants: 'التجار',
+                   subs: 'الاشتراكات', reports: 'البلاغات',
                    requests: 'الطلبات والتوثيق', plans: 'الباقات',
                    payments: 'مراجعة المدفوعات' };
 
@@ -316,13 +524,72 @@ function wire() {
     const req    = e.target.closest('[data-req]');
     const rs     = e.target.closest('[data-rs]');
     const qs     = e.target.closest('[data-qs]');
+    const kyc    = e.target.closest('[data-kyc]');
+    const slots  = e.target.closest('[data-slots]');
+    const ext    = e.target.closest('[data-extend]');
+    const sdet   = e.target.closest('[data-store]');
+    const kTab   = e.target.closest('#kycTabs [data-k]');
+    const sTab   = e.target.closest('#subTabs [data-s]');
 
     if (nav) {
       $$('.view').forEach((s) => s.classList.toggle('on', s.id === 'v-' + nav.dataset.v));
       $$('.nav button').forEach((b) => b.classList.toggle('on', b === nav));
       $('#ttl').textContent = TITLES[nav.dataset.v];
       $('#side').classList.remove('open');
+      // تُجلب عند الفتح لا عند تحميل اللوحة
+      if (nav.dataset.v === 'merchants') loadMerchants($('#merchQ').value);
+      if (nav.dataset.v === 'subs') loadSubs();
     }
+
+    if (kTab) {
+      $$('#kycTabs [data-k]').forEach((b) => b.classList.toggle('on', b === kTab));
+      kycFilter = kTab.dataset.k;
+      return loadMerchants($('#merchQ').value);
+    }
+
+    if (sTab) {
+      $$('#subTabs [data-s]').forEach((b) => b.classList.toggle('on', b === sTab));
+      subFilter = sTab.dataset.s;
+      return loadSubs();
+    }
+
+    if (kyc) {
+      const to = kyc.dataset.to;
+      // الرفض يحتاج سبباً: قرارٌ بلا سبب لا يُراجَع ولا يُفسَّر
+      const note = to === 'rejected'
+        ? prompt('سبب الرفض (يظهر للتاجر):') : prompt('ملاحظة على الاعتماد (اختيارية):', '');
+      if (to === 'rejected' && !note) return;
+      try {
+        await api.patch(`/api/admin/merchants/${kyc.dataset.kyc}`, { kyc: to, note: note ?? '' });
+        toast(to === 'approved' ? 'اعتُمد التاجر ووُثّقت متاجره' : 'رُفضت البيانات');
+        await Promise.all([loadMerchants($('#merchQ').value), loadStats()]);
+      } catch (err) { toast(err.message, 'bad'); }
+    }
+
+    if (slots) {
+      const n = prompt('عدد خانات المتاجر لهذا التاجر:', slots.dataset.now);
+      if (n === null) return;
+      try {
+        await api.patch(`/api/admin/merchants/${slots.dataset.slots}`, { slots: Number(n) });
+        toast('حُدّثت الخانات');
+        await loadMerchants($('#merchQ').value);
+      } catch (err) { toast(err.message, 'bad'); }
+    }
+
+    if (ext) {
+      const days = prompt('كم يوماً تُمدّد الاشتراك؟', '30');
+      if (days === null) return;
+      try {
+        await api.patch(`/api/admin/subscriptions/${ext.dataset.extend}`, { extendDays: Number(days) });
+        toast('مُدّد الاشتراك');
+        if (!$('#v-subs').classList.contains('on')) return;
+        await loadSubs();
+      } catch (err) { toast(err.message, 'bad'); }
+    }
+
+    if (sdet) openStore(sdet.dataset.store);
+    if (e.target.closest('[data-close]')) openSheet(false);
+    if (e.target.id === 'dim') openSheet(false);
 
     if (verify) {
       try {
@@ -407,6 +674,18 @@ function wire() {
   $('#storeQ').addEventListener('input', (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => loadStores(e.target.value), 280);
+  });
+
+  let merchTimer;
+  $('#merchQ').addEventListener('input', (e) => {
+    clearTimeout(merchTimer);
+    merchTimer = setTimeout(() => loadMerchants(e.target.value), 280);
+  });
+
+  // Escape يغلق الملفّ: نافذة بلا مخرج بلوحة المفاتيح تحبس
+  // مَن لا يستعمل الفأرة
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('#detail').classList.contains('on')) openSheet(false);
   });
 
   $('#burger').addEventListener('click', () => $('#side').classList.toggle('open'));

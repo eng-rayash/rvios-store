@@ -10,25 +10,31 @@ import { finish } from './finish.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 
-const { db, now } = await import('../src/db.js');
-const { runReminderSweep, runSubscriptionSweep } = await import('../src/billing.js');
+const { db, now } = await import('../server/db.js');
+const { runReminderSweep, runSubscriptionSweep } = await import('../server/billing.js');
+const { toE164 } = await import('../server/countries.js');
+
+// الأرقام تُخزَّن دولية موحّدة. الإدراج المباشر يتخطّى توحيد
+// الخادم، فنوحّد هنا صراحةً — وإلا بقي في القاعدة رقم محلي
+// وحيد يُبلغ عنه `ops/migrate-phones.mjs` كأنه صفّ متخلّف.
+const PHONE = toE164('700111222');
 
 const inDays = (n) => new Date(Date.now() + n * 86400000).toISOString();
 
 // تنظيف مسبق: تشغيل سابق انقطع قد يترك صفوفاً، ومجموعة
 // اختبار تفشل بسبب سابقتها تُخفي الأخطاء الحقيقية
 await db.prepare(`DELETE FROM stores WHERE slug = 'rem-test'`).run();
-await db.prepare(`DELETE FROM merchants WHERE phone = '700111222'`).run();
+await db.prepare('DELETE FROM merchants WHERE phone = ?').run(PHONE);
 await db.prepare(`DELETE FROM audit_log WHERE target = 'rem-test'`).run();
 
 // متجر اختبار معزول — لا نلمس متاجر البذرة
 const merchantId = (await db.prepare(
   `INSERT INTO merchants (phone, created_at) VALUES (?,?)`,
-).run('700111222', now())).lastInsertRowid;
+).run(PHONE, now())).lastInsertRowid;
 
 const storeId = Number((await db.prepare(`
   INSERT INTO stores (merchant_id, slug, name, whatsapp, plan, created_at)
-  VALUES (?,?,?,?,?,?)`).run(merchantId, 'rem-test', 'متجر التذكير', '700111222', 'plus', now())).lastInsertRowid);
+  VALUES (?,?,?,?,?,?)`).run(merchantId, 'rem-test', 'متجر التذكير', PHONE, 'plus', now())).lastInsertRowid);
 
 const subId = Number((await db.prepare(`
   INSERT INTO subscriptions (store_id, plan, status, current_period_end, created_at)

@@ -8,6 +8,7 @@
 import { db, now, migrate } from './db.js';
 import { scope } from './tenancy.js';
 import { makeRef } from './orders.js';
+import { toE164 } from './countries.js';
 
 const RESET = process.argv.includes('--reset');
 
@@ -35,13 +36,20 @@ if ((await db.prepare('SELECT COUNT(*)::int n FROM stores').get()).n > 0) {
 const ago = (days, hours = 0) =>
   new Date(Date.now() - days * 86400000 - hours * 3600000).toISOString();
 
+/**
+ * الأرقام مكتوبة أدناه بصيغتها المحلية لأنها أقرأ، وتُخزَّن
+ * دولية لأن تسجيل الدخول يبحث بالصيغة الدولية منذ هجرة
+ * `ops/migrate-phones.mjs`. البذر بلا توحيد يعني تاجراً مبذوراً
+ * لا يستطيع الدخول إلى متجره.
+ */
 async function merchant(phone, name) {
   const res = await db.prepare('INSERT INTO merchants (phone, name, created_at) VALUES (?,?,?)')
-    .run(phone, name, ago(60));
+    .run(toE164(phone), name, ago(60));
   return Number(res.lastInsertRowid);
 }
 
 async function store(merchantId, data) {
+  if (data.whatsapp) data = { ...data, whatsapp: toE164(data.whatsapp) };
   const cols = Object.keys(data);
   const res = await db.prepare(
     `INSERT INTO stores (merchant_id, ${cols.join(',')}, created_at) VALUES (?, ${cols.map(() => '?').join(',')}, ?)`)
@@ -186,18 +194,23 @@ for (const [i, [name, c, price, qty]] of [
 }
 
 // ═══ ٣. متجر برو — لعرض الطبقة الفاخرة وسكِن منتصف الليل ══
-const m4 = await merchant('712334455', 'أطلس');
+//
+// كان هذا الموضع لـ«أطلس للإلكترونيات»، وحلّ محلّه «سيركل تك»
+// بمواد التاجر الحقيقية. وما هنا هيكلٌ مختصر يكفي فحوص الخادم
+// القديم: الكتالوج الكامل بصوره في `scripts/seed-circletech.mjs`،
+// ويُشغَّل بعد هذه البذرة فيُحدِّث المتجر نفسه بالرابط.
+const m4 = await merchant('712334455', 'سيركل تك');
 const s4 = await store(m4, {
-  slug: 'atlas',
-  name: 'أطلس للإلكترونيات',
+  slug: 'circletech',
+  name: 'سيركل تك للإلكترونيات',
   sector: 'electronics',
-  tagline: 'أجهزة أصلية بضمان معتمد',
+  tagline: 'أجهزة أصلية بضمان الوكيل',
   about: 'وكلاء معتمدون لأجهزة الهاتف والحاسب والصوتيات. كل جهاز مختوم بضمان سنة، وصيانة داخلية في المعرض.',
   city: 'صنعاء',
   address: 'صنعاء — شارع الزبيري',
   whatsapp: '712334455',
   hours: 'السبت – الخميس: ٩ص – ١٠م',
-  color: '#1F4E79', color_deep: '#143451',
+  color: '#38C0D8', color_deep: '#12556E',
   banner: '/assets/img/sectors/electronics.jpg',
   showcase: '/assets/img/sectors/accessories.jpg',
   theme: 'midnight',
@@ -243,19 +256,19 @@ await scope(s3).insert('reports', {
 
 // ── طلبات خدمات مفتوحة ───────────────────────────────────
 await S2.insert('service_requests', {
-  kind: 'verify', contact: '733445566',
+  kind: 'verify', contact: toE164('733445566'),
   detail: 'أرغب بتوثيق المتجر — لدي سجل تجاري.',
   status: 'open', created_at: ago(2),
 });
 await db.prepare('INSERT INTO service_requests (store_id, kind, contact, detail, status, created_at) VALUES (NULL,?,?,?,?,?)')
-  .run('build', '739112233', 'أريد أن تنشئوا متجري — لدي ٤٠ منتجاً.', 'open', ago(1));
+  .run('build', toE164('739112233'), 'أريد أن تنشئوا متجري — لدي ٤٠ منتجاً.', 'open', ago(1));
 
 console.log(`
   ✔ تم بناء البيانات الأولية
 
-    متجر ذو يزن للعطور  →  http://localhost:3000/yazan          (بلس · تصميم دافئ · موثّق · ٩ منتجات)
-    نورا بوتيك           →  http://localhost:3000/nura-boutique  (مجانية · تصميم نقي · ٣ منتجات)
-    أطلس للإلكترونيات    →  http://localhost:3000/atlas          (برو · تصميم فاخر · سكِن منتصف الليل)
+    متجر ذو يزن للعطور  →  http://localhost:3001/yazan          (بلس · تصميم دافئ · موثّق · ٩ منتجات)
+    نورا بوتيك           →  http://localhost:3001/nura-boutique  (مجانية · تصميم نقي · ٣ منتجات)
+    سيركل تك             →  http://localhost:3001/circletech     (برو · تصميم فاخر · سكِن منتصف الليل)
     متجر تحت المراجعة    →  موقوف — يظهر في لوحة الإدارة مع بلاغ
 
     قارن الثلاثة جنباً إلى جنب: نفس المحرّك، وثلاث درجات تصميم.
@@ -263,7 +276,7 @@ console.log(`
     للدخول كتاجر: /login
       ٧٧٧٠٠٠٠٠٠  →  ذو يزن
       ٧٣٣٤٤٥٥٦٦  →  نورا
-      ٧١٢٣٣٤٤٥٥  →  أطلس
+      ٧١٢٣٣٤٤٥٥  →  سيركل تك
     رمز التحقق يظهر في الصفحة وفي سجل الخادم (وضع التطوير).
 `);
 await db.close();

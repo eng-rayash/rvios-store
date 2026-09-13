@@ -12,7 +12,19 @@ export const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 
 /** أرقام عربية-هندية — لغة الواجهة (§٧.١) */
 export const AR = (n) => Number(n ?? 0).toLocaleString('ar-EG');
-export const money = (n) => `${AR(n)} <span class="cur">ر.ي</span>`;
+
+/**
+ * رمز العملة — حالة وحيدة تُضبط مرة عند تحميل المتجر.
+ *
+ * كان مكتوباً بالقيمة في اثنين وعشرين موضعاً، وكل موضع منها
+ * قفلٌ يمني صامت: متجر في عمّان يعرض أسعاره بالريال اليمني ولا
+ * شيء في الواجهة يشي بالخطأ حتى يدفع عميل. والافتراضي يبقى
+ * `ر.ي` فلا يتغيّر شيء لمن لم يضبط دولته.
+ */
+let CURRENCY = 'ر.ي';
+export const setCurrency = (sym) => { CURRENCY = sym || 'ر.ي'; };
+export const currency = () => CURRENCY;
+export const money = (n) => `${AR(n)} <span class="cur">${CURRENCY}</span>`;
 
 export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>

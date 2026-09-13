@@ -4,9 +4,10 @@
 //  لأن سرعة رده هي عنق الزجاجة الحقيقي في تدفق واتساب.
 // ═══════════════════════════════════════════════════════════
 import {
-  $, $$, api, AR, money, escapeHtml, toast, withBusy, trapFocus, applyTheme,
-  scopeTheme, derivePalette, tierOf, when, setApiStore,
+  $, $$, api, AR, money, currency, setCurrency, escapeHtml, toast, withBusy,
+  trapFocus, applyTheme, scopeTheme, derivePalette, tierOf, when, setApiStore,
 } from './app.js';
+import { COUNTRIES, DEFAULT_COUNTRY } from './countries.js';
 
 const STATES = {
   wait: ['b-wait', 'قيد التأكيد'], ok: ['b-ok', 'مؤكد'],
@@ -20,10 +21,11 @@ const COLORS = [
   ['#B45309', '#7C3A06'],
 ];
 const TIER_NAME = { clean: 'نقي', warm: 'دافئ', signature: 'فاخر' };
-let SKINS = [];
+let SKINS = [], LAYOUTS = [];
 
 let STORE = null, CATS = [], PRODUCTS = [], PLAN = null, CAPACITY = {};
 let STORES = [], SLOTS = { owned: 1, slots: 1, free: 0 };
+let ZONES = [];
 let draft = { images: [], variants: [] };  // تعديلات غير محفوظة (إعدادات + معرض المنتج + خياراته)
 let editingId = null;
 let closeSheet = null;
@@ -46,9 +48,20 @@ async function boot() {
   wire();
 }
 
+/**
+ * عناوين الحقول التي تذكر العملة.
+ * كانت `(ر.ي)` مكتوبة في HTML، فيكتب تاجر أردني سعره في حقل
+ * يقول له إنه بالريال اليمني — ولا شيء يكسر، ولا أحد يحذّر.
+ */
+function paintCurrencyLabels() {
+  $$('.cur-lbl').forEach((el) => { el.textContent = currency(); });
+}
+
 async function loadStore() {
   const res = await api.get('/api/me/store');
-  STORE = res.store; PLAN = res.plan; SKINS = res.skins ?? [];
+  STORE = res.store; PLAN = res.plan; SKINS = res.skins ?? []; LAYOUTS = res.layouts ?? [];
+  setCurrency(STORE.currency);      // قبل أي رسم: العملة تتبع دولة المتجر
+  paintCurrencyLabels();
   setApiStore(STORE.slug);          // كل نداء تالٍ يحمل المتجر النشط
   applyTheme(STORE);
   paintHeader();
@@ -141,7 +154,7 @@ async function loadOverview() {
   $('#kpis').innerHTML = kpis.map((k) => `
     <div class="kpi ${k.hot ? 'hot' : ''}">
       <small>${k.icon}${k.label}</small>
-      <b>${k.money ? AR(k.value) : AR(k.value)}${k.money ? ' <span style="font-size:14px;font-family:var(--body);color:var(--soft)">ر.ي</span>' : ''}</b>
+      <b>${k.money ? AR(k.value) : AR(k.value)}${k.money ? ` <span style="font-size:14px;font-family:var(--body);color:var(--soft)">${currency()}</span>` : ''}</b>
     </div>`).join('');
 
   $('#pendPill').hidden = !d.kpis.pending;
@@ -209,7 +222,7 @@ function orderRow(o, compact) {
       <small>${when(o.created_at)} · ${AR(o.items?.length ?? 0)} منتج</small>
     </div>
     <span class="badge ${cls}">${label}</span>
-    <span class="amt">${AR(o.total)} <span style="font-family:var(--body);font-size:12px;color:var(--soft);font-weight:500">ر.ي</span></span>
+    <span class="amt">${AR(o.total)} <span style="font-family:var(--body);font-size:12px;color:var(--soft);font-weight:500">${currency()}</span></span>
     ${compact ? '' : `
       <a class="btn btn-wa btn-sm" href="${escapeHtml(o.wa ?? '#')}" target="_blank" rel="noopener">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5A8.5 8.5 0 1 1 21 11.5Z"/></svg>
@@ -285,7 +298,7 @@ async function loadProducts() {
         <div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.summary || '')}</small></div>
       </div></td>
       <td>${escapeHtml(p.categoryName || '—')}</td>
-      <td><span class="money" style="font-size:19px">${AR(p.price)}</span> <span style="font-size:11.5px;color:var(--soft)">ر.ي</span></td>
+      <td><span class="money" style="font-size:19px">${AR(p.price)}</span> <span style="font-size:11.5px;color:var(--soft)">${currency()}</span></td>
       <td>${p.qty ? `${AR(p.qty)} قطعة` : '<span style="color:var(--danger);font-weight:700">نفد</span>'}</td>
       <td><span class="badge ${p.live ? 'b-ok' : 'b-off'}">${p.live ? 'منشور' : 'مخفي'}</span></td>
       <td><div class="acts-cell">
@@ -314,8 +327,170 @@ async function loadCats() {
     : `<tr><td colspan="4"><div class="empty"><p>لا تصنيفات بعد.<br>التصنيفات تساعد عملاءك على التصفح.</p></div></td></tr>`;
 }
 
+// ═══ العملاء ═════════════════════════════════════════════
+/**
+ * الإحصاءات تأتي محسوبة من الخادم ولا تُخزَّن في أي مكان.
+ * العائدون هم الرقم الذي يهمّ فعلاً: عميل اشترى مرتين يساوي
+ * عشرة زوّار جدد، وهو ما لا تُظهره أي لوحة أخرى في السوق.
+ */
+async function loadCustomers() {
+  const d = await api.get('/api/me/customers');
+
+  $('#custSum').textContent = d.total
+    ? `${AR(d.total)} عميلاً · ${AR(d.returning)} عادوا للشراء`
+    : 'لا عملاء بعد';
+
+  $('#custRows').innerHTML = d.customers.length ? d.customers.map((c) => `
+    <tr>
+      <td><b style="font-size:13.5px">${escapeHtml(c.name || 'بلا اسم')}</b>${
+        c.orders_count > 1 ? ' <span class="badge b-ok">عائد</span>' : ''}</td>
+      <td dir="ltr" style="font-variant-numeric:tabular-nums">${escapeHtml(c.phone)}</td>
+      <td>${AR(c.orders_count)}</td>
+      <td><span class="money">${AR(c.spent)}</span> <span style="font-size:11.5px;color:var(--soft)">${currency()}</span></td>
+      <td style="color:var(--soft);font-size:12.5px">${c.last_order ? when(c.last_order) : '—'}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="5"><div class="empty"><p>لا عملاء بعد.<br>سيظهر هنا كل من يطلب من متجرك.</p></div></td></tr>`;
+}
+
+// ═══ التقييمات ═══════════════════════════════════════════
+//  التاجر لا يحذف رأياً ولا يعدّله — يُخفي ويردّ. حذفُ الرأي
+//  يحوّل صفحة التقييمات إلى دعاية، وأول عميل يكتشف ذلك يُسقط
+//  ثقته بكل نجمة في المتجر.
+
+let REV_FILTER = '';
+
+/** نجومٌ صغيرة للوحة — رسمٌ لا محرف، للسبب نفسه في صفحة المتجر */
+function dashStars(n) {
+  return `<span class="dstars" aria-label="${AR(n)} من ٥">${
+    Array.from({ length: 5 }, (_, i) => `
+      <svg viewBox="0 0 20 20" class="${i < n ? 'on' : ''}" aria-hidden="true">
+        <path d="M10 1.6l2.5 5.1 5.6.8-4 4 .9 5.6-5-2.7-5 2.7.9-5.6-4-4 5.6-.8z"/>
+      </svg>`).join('')}</span>`;
+}
+
+async function loadReviews() {
+  const d = await api.get(`/api/me/reviews${REV_FILTER ? `?filter=${REV_FILTER}` : ''}`);
+  const s = d.summary;
+
+  $('#revSum').textContent = s.count
+    ? `${s.average.toFixed(1)} من ٥ · ${AR(s.count)} تقييم`
+    : 'لا تقييمات بعد';
+
+  // الشارة تعدّ ما ينتظر عملاً: تقييمٌ بلا ردّ. عدّ الكل يجعلها
+  // رقماً يكبر أبداً ولا يدعو إلى فعل
+  const pill = $('#revPill');
+  if (pill) { pill.hidden = !s.unanswered; pill.textContent = AR(s.unanswered); }
+
+  $('#revList').innerHTML = d.reviews.length ? d.reviews.map((r) => `
+    <article class="drev ${r.hidden ? 'off' : ''}" data-id="${r.id}">
+      <div class="drev-h">
+        ${dashStars(r.rating)}
+        <b>${escapeHtml(r.name)}</b>
+        ${r.verified ? '<span class="badge b-ok">مشترٍ موثَّق</span>' : ''}
+        ${r.hidden ? '<span class="badge">مخفيّ</span>' : ''}
+        <span class="drev-p">${escapeHtml(r.productName)}</span>
+        <time>${when(r.createdAt)}</time>
+      </div>
+      ${r.body ? `<p>${escapeHtml(r.body)}</p>` : '<p class="muted">بلا نصّ — نجوم فقط</p>'}
+      ${r.reply ? `<div class="drev-r"><b>ردّك</b><p>${escapeHtml(r.reply)}</p></div>` : ''}
+      <div class="drev-a">
+        <button class="btn btn-line btn-sm" data-reply="${r.id}">${r.reply ? 'عدّل ردّك' : 'ردّ'}</button>
+        <button class="btn btn-line btn-sm" data-hide="${r.id}">${r.hidden ? 'إظهار' : 'إخفاء'}</button>
+      </div>
+    </article>`).join('')
+    : `<div class="empty"><p>${REV_FILTER ? 'لا تقييمات في هذا التصنيف.' : 'لا تقييمات بعد.<br>ستظهر هنا آراء عملائك فور كتابتها.'}</p></div>`;
+}
+
+async function patchReview(id, patch) {
+  await api.patch(`/api/me/reviews/${id}`, patch);
+  await loadReviews();
+}
+
+function bindReviews() {
+  $('#revTabs')?.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-f]');
+    if (!b) return;
+    $$('#revTabs button').forEach((x) => x.classList.toggle('on', x === b));
+    REV_FILTER = b.dataset.f;
+    loadReviews();
+  });
+
+  $('#revList')?.addEventListener('click', async (e) => {
+    const hide = e.target.closest('[data-hide]');
+    const reply = e.target.closest('[data-reply]');
+    try {
+      if (hide) {
+        const card = hide.closest('.drev');
+        return await patchReview(hide.dataset.hide, { hidden: !card.classList.contains('off') });
+      }
+      if (reply) {
+        const card = reply.closest('.drev');
+        const old = card.querySelector('.drev-r p')?.textContent ?? '';
+        const text = prompt('ردّك على هذا التقييم (اتركه فارغاً لحذف الردّ):', old);
+        if (text === null) return;
+        return await patchReview(reply.dataset.reply, { reply: text });
+      }
+    } catch (err) { toast(err.message, 'bad'); }
+  });
+}
+
+// ═══ التوصيل والدفع ══════════════════════════════════════
+const PAY_OPTIONS = [
+  { id: 'cod',    label: 'عند الاستلام', note: 'لا يمكن إيقافه — متجر بلا طريقة دفع لا يستقبل طلباً' },
+  { id: 'wallet', label: 'محفظة إلكترونية', note: 'الكريمي · جيب · وغيرها — يرفع العميل صورة الإيصال' },
+  { id: 'bank',   label: 'تحويل بنكي', note: 'يرفع العميل صورة الإيصال وتؤكّده أنت' },
+];
+
+async function loadDelivery() {
+  const [d, store] = await Promise.all([
+    api.get('/api/me/zones'),
+    api.get('/api/me/store').catch(() => ({ store: STORE })),
+  ]);
+  ZONES = d.zones;
+
+  $('#zoneHint').textContent = d.zones.length
+    ? 'الرسم يتبع المنطقة التي يختارها العميل.'
+    : `لا مناطق بعد — يُطبَّق رسم واحد على كل الطلبات (${AR(d.fallback.fee)} ${currency()}). أضف مناطق ليدفع كل عميل رسم مدينته.`;
+
+  $('#zoneRows').innerHTML = d.zones.length ? d.zones.map((z) => `
+    <tr>
+      <td><b style="font-size:13.5px">${escapeHtml(z.name)}</b></td>
+      <td><span class="money">${AR(z.fee)}</span> <span style="font-size:11.5px;color:var(--soft)">${currency()}</span></td>
+      <td>${z.free_over ? `${AR(z.free_over)} ${currency()}` : '—'}</td>
+      <td><div class="acts-cell">
+        <button class="ico" data-zedit="${z.id}" aria-label="تعديل"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button class="ico dz" data-zdel="${z.id}" aria-label="حذف"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+      </div></td>
+    </tr>`).join('')
+    : `<tr><td colspan="4"><div class="empty"><p>لا مناطق بعد.</p></div></td></tr>`;
+
+  const active = String(store.store?.payMethods ?? STORE.payMethods ?? 'cod')
+    .split(',').map((m) => m.trim());
+
+  $('#payMethods').innerHTML = PAY_OPTIONS.map((m) => `
+    <label class="chk" style="display:flex;gap:10px;align-items:flex-start;padding:12px;
+                              border:1.5px solid var(--line);border-radius:var(--r-sm)">
+      <input type="checkbox" data-pay="${m.id}" ${active.includes(m.id) ? 'checked' : ''}
+             ${m.id === 'cod' ? 'disabled' : ''} style="margin-top:3px">
+      <span>
+        <b style="display:block;font-size:13.5px">${escapeHtml(m.label)}</b>
+        <small style="color:var(--soft);font-size:11.5px">${escapeHtml(m.note)}</small>
+      </span>
+    </label>`).join('');
+
+  $('#payNote').value = store.store?.payNote ?? STORE.payNote ?? '';
+}
+
 // ═══ الإعدادات ═══════════════════════════════════════════
 function fillSettings() {
+  // خيارات الدولة تُبنى مرة واحدة من countries.js لا تُكتب في HTML
+  const cSel = $('#setCountry');
+  if (cSel && !cSel.options.length) {
+    cSel.innerHTML = Object.values(COUNTRIES)
+      .map((c) => `<option value="${c.code}">${escapeHtml(c.name)} (+${c.dial})</option>`).join('');
+  }
+  if (cSel) cSel.value = STORE.country || DEFAULT_COUNTRY;
+
   $('#setName').value    = STORE.name;
   $('#setTagline').value = STORE.tagline;
   $('#setAbout').value   = STORE.about;
@@ -343,6 +518,7 @@ function fillSettings() {
     `<span class="badge b-ok">تصميم ${escapeHtml(PLAN.design?.name ?? TIER_NAME[tier])}</span>`;
 
   paintSkins();
+  paintLayouts();
 
   $('#vBadge').innerHTML = STORE.verified
     ? '<span class="badge b-ok">موثّق</span>'
@@ -391,6 +567,38 @@ function paintSkins() {
     : 'يُطبَّق على واجهة متجرك فور الحفظ.';
 }
 
+/**
+ * القوالب — الاختيار حكرٌ على برو كالسكِنات (§٢.١).
+ *
+ * والفرق بين المحورين يُقال بالمصغّرة لا بالكلام: «التوقيع»
+ * خلايا مربّعة، و«أتولييه» خلايا طولية — وهو ما يتغيّر فعلاً.
+ */
+function paintLayouts() {
+  const current = draft.layout ?? STORE.savedLayout ?? STORE.layout ?? 'signature';
+  const locked = !PLAN.extraThemes;
+
+  $('#layouts').innerHTML = LAYOUTS.map((l) => `
+    <button type="button" class="layout ${l.id === current ? 'on' : ''}" data-layout="${escapeHtml(l.id)}"
+            ${locked && l.id !== 'signature' ? 'disabled' : ''}>
+      <span class="mini m-${escapeHtml(l.id)}" aria-hidden="true">
+        <i class="bar"></i><span class="row"><i></i><i></i><i></i></span>
+      </span>
+      <em>${escapeHtml(l.name)}</em>
+      <small>${escapeHtml(l.desc)}</small>
+    </button>`).join('');
+
+  // المصغّرات تُصبغ بلون التاجر كمصغّرات السكِنات
+  const palette = derivePalette(draft.color ?? STORE.color, { deep: draft.colorDeep ?? STORE.colorDeep });
+  $$('#layouts .mini').forEach((el) => {
+    for (const [k, v] of Object.entries(palette)) el.style.setProperty(k, v);
+  });
+
+  // القالب يُقرأ على الخادم بعد إعادة التوليد، فلا نَعِد بالفور
+  $('#layoutHint').textContent = locked
+    ? 'القوالب الإضافية متاحة في باقة برو — متجرك يعرض «التوقيع».'
+    : 'يُطبَّق على واجهة متجرك بعد الحفظ بدقيقة على الأكثر.';
+}
+
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
 
 /**
@@ -409,6 +617,7 @@ function pickColor(color, deep) {
 
   applyTheme({ color: draft.color, colorDeep: draft.colorDeep });   // كروم اللوحة: --shop فقط
   paintSkins();
+  paintLayouts();
   updatePreview();
 }
 
@@ -440,6 +649,15 @@ function updatePreview() {
     theme: PLAN.extraThemes ? (draft.theme ?? STORE.savedTheme ?? 'signature') : 'signature',
   });
   $('#pvTier').textContent = `طبقة ${TIER_NAME[tierOf(STORE.plan)]}`;
+
+  // القالب يغيّر بنية الصفحة لا لونها — نعلنه على المعاينة
+  // ويكتفي CSS بتحويل بطاقتَي المنتج إلى صور طولية. ولا نحاول
+  // محاكاة الهيرو ولا المقاسات في ٢٠٠ بكسل: معاينة تَعِد بما
+  // لا تُريه أسوأ من معاينة صادقة ناقصة.
+  $('#prev').dataset.layout = PLAN.extraThemes
+    ? (draft.layout ?? STORE.savedLayout ?? 'signature')
+    : 'signature';
+
   return preview;
 }
 
@@ -823,7 +1041,9 @@ function wireDrop(dropId, fileId, prevId, onDone, maxSide) {
 // ═══ الأحداث ═════════════════════════════════════════════
 function wire() {
   const TITLES = { home: 'نظرة عامة', orders: 'الطلبات', products: 'المنتجات',
-                   cats: 'التصنيفات', settings: 'إعدادات المتجر', plan: 'الاشتراك والفوترة' };
+                   cats: 'التصنيفات', customers: 'العملاء', reviews: 'التقييمات',
+                   delivery: 'التوصيل والدفع',
+                   settings: 'إعدادات المتجر', plan: 'الاشتراك والفوترة' };
 
   function go(v) {
     $$('.view').forEach((s) => s.classList.toggle('on', s.id === 'v-' + v));
@@ -831,6 +1051,12 @@ function wire() {
     $('#ttl').textContent = TITLES[v];
     $('#side').classList.remove('open');
     scrollTo({ top: 0, behavior: 'smooth' });
+
+    // تُجلب عند الفتح لا عند تحميل اللوحة: التاجر يفتح الطلبات
+    // عشر مرات يومياً والعملاء مرة، فتحميلهما معاً يُبطئ ما يهمّه
+    if (v === 'customers') loadCustomers();
+    if (v === 'delivery')  loadDelivery();
+    if (v === 'reviews')   loadReviews();
   }
 
   document.addEventListener('click', async (e) => {
@@ -870,6 +1096,33 @@ function wire() {
       const c = CATS.find((x) => x.id === Number(cdel.dataset.cdel));
       if (!confirm(`حذف تصنيف «${c.name}»؟ ستبقى منتجاته بلا تصنيف.`)) return;
       try { await api.del(`/api/me/categories/${c.id}`); toast('حُذف التصنيف'); await loadCats(); await loadProducts(); }
+      catch (err) { toast(err.message, 'bad'); }
+    }
+
+    // ── مناطق التوصيل ──
+    const zedit = e.target.closest('[data-zedit]');
+    const zdel  = e.target.closest('[data-zdel]');
+
+    if (zedit) {
+      const z = ZONES.find((x) => x.id === Number(zedit.dataset.zedit));
+      const name = prompt('اسم المنطقة', z.name);
+      if (name === null) return;
+      const fee = prompt('رسم التوصيل بالريال', z.fee);
+      if (fee === null) return;
+      const freeOver = prompt('مجاني فوق (اتركه صفراً لتعطيله)', z.free_over);
+      if (freeOver === null) return;
+      try {
+        await api.patch(`/api/me/zones/${z.id}`, { name, fee, freeOver });
+        toast('حُدّثت المنطقة'); await loadDelivery();
+      } catch (err) { toast(err.message, 'bad'); }
+    }
+
+    if (zdel) {
+      const z = ZONES.find((x) => x.id === Number(zdel.dataset.zdel));
+      // الطلبات القديمة تحتفظ باسم المنطقة ورسمها نصّاً، فلا يتغيّر
+      // شيء فيما مضى — ونقولها للتاجر صراحةً ليطمئن
+      if (!confirm(`حذف منطقة «${z.name}»؟ الطلبات السابقة تحتفظ برسمها كما هو.`)) return;
+      try { await api.del(`/api/me/zones/${z.id}`); toast('حُذفت المنطقة'); await loadDelivery(); }
       catch (err) { toast(err.message, 'bad'); }
     }
 
@@ -945,6 +1198,13 @@ function wire() {
     if (skin && !skin.disabled) {
       $$('.skin').forEach((s) => s.classList.toggle('on', s === skin));
       draft.theme = skin.dataset.skin;
+      updatePreview();
+    }
+
+    const lay = e.target.closest('[data-layout]');
+    if (lay && !lay.disabled) {
+      $$('.layout').forEach((x) => x.classList.toggle('on', x === lay));
+      draft.layout = lay.dataset.layout;
       updatePreview();
     }
   });
@@ -1083,6 +1343,32 @@ function wire() {
     catch (err) { toast(err.message, 'bad'); }
   });
 
+  // ── التوصيل والدفع ──
+  $('#addZone').addEventListener('click', async () => {
+    const name = prompt('اسم المنطقة (مثال: صنعاء)');
+    if (!name?.trim()) return;
+    const fee = prompt('رسم التوصيل بالريال', '1000');
+    if (fee === null) return;
+    const freeOver = prompt('مجاني فوق مبلغ (اتركه صفراً لتعطيله)', '0');
+    if (freeOver === null) return;
+    try {
+      await api.post('/api/me/zones', { name: name.trim(), fee, freeOver });
+      toast('أُضيفت المنطقة'); await loadDelivery();
+    } catch (err) { toast(err.message, 'bad'); }
+  });
+
+  $('#savePay').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    // «عند الاستلام» مُعطَّل في الواجهة ولا يصل هنا، والخادم
+    // يفرضه ثانيةً — فلا يمكن حفظ متجر بلا طريقة دفع واحدة
+    const payMethods = $$('#payMethods [data-pay]')
+      .filter((c) => c.checked || c.dataset.pay === 'cod')
+      .map((c) => c.dataset.pay);
+
+    await api.patch('/api/me/store', { payMethods, payNote: $('#payNote').value.trim() });
+    toast('حُفظت طرق الدفع');
+    await loadStore();
+  }).catch(() => {}));
+
   // ── الإعدادات ──
   ['setName', 'setTagline', 'setSlug'].forEach((id) =>
     $(`#${id}`).addEventListener('input', updatePreview));
@@ -1136,6 +1422,7 @@ function wire() {
       name: $('#setName').value.trim(),
       tagline: $('#setTagline').value.trim(),
       about: $('#setAbout').value.trim(),
+      country: $('#setCountry').value,
       whatsapp: $('#setWa').value.trim(),
       city: $('#setCity').value.trim(),
       address: $('#setAddress').value.trim(),
@@ -1150,6 +1437,7 @@ function wire() {
     if (draft.banner)   payload.banner = draft.banner;
     if (draft.showcase) payload.showcase = draft.showcase;
     if (draft.theme && PLAN.extraThemes) payload.theme = draft.theme;
+    if (draft.layout && PLAN.extraThemes) payload.layout = draft.layout;
 
     const res = await api.patch('/api/me/store', payload);
     STORE = res.store;
@@ -1157,6 +1445,8 @@ function wire() {
     // المفتوح وخياراته يبقيان — إسقاطهما هنا يفقد التاجر شبكة
     // مقاسات كتبها للتوّ بلا أي إشارة.
     draft = { images: draft.images ?? [], variants: draft.variants ?? [] };
+    setCurrency(STORE.currency);       // تغيير الدولة يغيّر العملة فوراً
+    paintCurrencyLabels();
     applyTheme(STORE);
     paintHeader();
     fillSettings();
@@ -1174,4 +1464,6 @@ function wire() {
     await api.post('/api/auth/logout');
     location.href = '/';
   });
+
+  bindReviews();
 }

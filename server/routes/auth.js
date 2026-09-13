@@ -12,8 +12,20 @@ import {
 import { config } from '../config.js';
 import { checkSlug, suggestSlug } from '../slug.js';
 import { PLANS } from '../plans.js';
+import { isSector, DEFAULT_SECTOR } from '../sectors.js';
 import { saveImage } from '../uploads.js';
 import { ensureSubscription, planPrices } from '../billing.js';
+import { COUNTRIES, DEFAULT_COUNTRY } from '../countries.js';
+import { verifyGoogleToken, googleStatus } from '../google.js';
+import { saveProfile, linkGoogle, publicProfile, profileComplete, BUSINESS_TYPES } from '../profile.js';
+
+/**
+ * رسالة الخطأ تُبنى من `COUNTRIES` لا تُكتب يدوياً: إضافة دولة
+ * سطرٌ واحد هناك، ولا يبقى نصّ يقول «أدخل رقماً يمنياً» بعد أن
+ * صار الأردن مقبولاً.
+ */
+const PHONE_HINT = 'رقم الجوال غير صحيح — اكتبه برمز دولتك مثل ‎+967777123456 ('
+  + Object.values(COUNTRIES).map((c) => c.name).join(' · ') + ')';
 
 /** ملخّص متاجر التاجر لعقد الجلسة */
 async function storeSummary(merchantId) {
@@ -27,8 +39,10 @@ export default async function register(r) {
   // ── ١. طلب رمز تحقق ───────────────────────────────────
   r.post('/api/auth/request-code', async (req, res) => {
     const body = await readBody(req);
-    const phone = normalizePhone(body.phone);
-    if (!validPhone(phone)) bad('رقم الجوال غير صحيح — أدخل رقماً يمنياً مثل ٧٧٧١٢٣٤٥٦');
+    // `country` اختياري: من يكتب رمز دولته صراحةً (+962…) لا يحتاجه،
+    // ومن يكتب رقمه المحلي يحتاج من يقول لنا أيّ دولة يقصد.
+    const phone = normalizePhone(body.phone, body.country);
+    if (!validPhone(phone)) bad(PHONE_HINT);
 
     // §٢.٢ — حد على الرقم وعلى الـIP معاً (§٧ خطر ٢: استنزاف رصيد الرسائل)
     const windowMs = config.otp.windowMinutes * 60_000;
@@ -60,8 +74,10 @@ export default async function register(r) {
   // ── ٢. تأكيد الرمز → جلسة ─────────────────────────────
   r.post('/api/auth/verify', async (req, res) => {
     const body = await readBody(req);
-    const phone = normalizePhone(body.phone);
-    if (!validPhone(phone)) bad('رقم الجوال غير صحيح');
+    // التوحيد نفسه المستعمل عند الإصدار — وإلا صار مفتاح الرمز
+    // مختلفاً عن مفتاح التحقّق وفشل كل رمز صحيح
+    const phone = normalizePhone(body.phone, body.country);
+    if (!validPhone(phone)) bad(PHONE_HINT);
 
     await verifyOtp(phone, body.code);
 
@@ -95,7 +111,54 @@ export default async function register(r) {
       hasStore: owned > 0,
       slug: stores[0]?.slug ?? null,
       storeName: stores[0]?.name ?? null,
+      // الإعداد يقرأ هذين ليعرف أين يستأنف: تاجر أكمل بياناته
+      // ثم انقطع لا يُعاد إلى خطوة ملأها
+      profile: publicProfile(m),
+      google: googleStatus(),
     });
+  });
+
+  // ═══ التحقق من هوية التاجر ════════════════════════════
+
+  // ── حالة تحقّق جوجل — تقرأها الواجهة قبل رسم الزر ──────
+  //  حين لا يكون مضبوطاً تتخطّى الواجهة الخطوة بدل أن تعرض
+  //  زراً لا يعمل: خادم تطوير بلا حساب Google Cloud يجب أن
+  //  يُكمل الإعداد لا أن يتوقّف عنده.
+  r.get('/api/auth/google/status', async (_req, res) => {
+    json(res, googleStatus());
+  });
+
+  // ── ربط بريد جوجل بالحساب ─────────────────────────────
+  r.post('/api/auth/google', async (req, res) => {
+    const merchant = await requireMerchant(req);
+    // رمز جوجل يُتحقّق منه بمفاتيحها، لكن حدّ المعدّل يبقى:
+    // كل محاولة رحلةُ شبكة إلى جوجل، ولا نترك بابها مفتوحاً
+    await rateLimit(`google:${clientIp(req)}`, { max: 10, windowMs: 10 * 60_000 });
+
+    const body = await readBody(req);
+    const claims = await verifyGoogleToken(body.credential);
+    const m = await linkGoogle(merchant.id, claims);
+
+    json(res, { ok: true, profile: publicProfile(m) });
+  });
+
+  // ── بيانات التاجر ─────────────────────────────────────
+  r.get('/api/me/profile', async (req, res) => {
+    const merchant = await requireMerchant(req);
+    json(res, {
+      profile: publicProfile(merchant),
+      businessTypes: Object.entries(BUSINESS_TYPES).map(([id, label]) => ({ id, label })),
+      google: googleStatus(),
+    });
+  });
+
+  r.patch('/api/me/profile', async (req, res) => {
+    const merchant = await requireMerchant(req);
+    const body = await readBody(req);
+    // `partial` أثناء الإعداد: التاجر يحفظ خطوةً نصفَها مكتمل
+    // ولا يُطالَب بكل الحقول قبل أن يصل إليها
+    const m = await saveProfile(merchant.id, body, { partial: body.partial === true });
+    json(res, { ok: true, profile: publicProfile(m) });
   });
 
   // ── ٤. خروج ───────────────────────────────────────────
@@ -123,13 +186,36 @@ export default async function register(r) {
       bad('بلغتَ عدد المتاجر المتاح في حسابك. اشترِ خانة متجر إضافي من قسم الاشتراك.', 'NO_STORE_SLOT');
     }
 
+    /**
+     * التحقق عند إنشاء المتجر الأول.
+     *
+     * على المتجر الأول وحده: التاجر يُعرَّف مرة، ومتجره الثاني
+     * يرث تعريفاً قائماً — إعادة سؤاله عبثٌ يوهم بأننا نسينا.
+     *
+     * والبريد يُشترط فقط حين يكون تحقّق جوجل مضبوطاً على هذا
+     * الخادم. اشتراطه بلا مفتاح يوقف كل إنشاء متجر في التطوير
+     * وفي أي نشرٍ لم يُربط بجوجل بعد.
+     */
+    if (owned === 0) {
+      if (!profileComplete(merchant)) {
+        bad('أكمل بياناتك الشخصية قبل إنشاء متجرك', 'PROFILE_INCOMPLETE');
+      }
+      if (config.google.enabled && !merchant.email_verified) {
+        bad('وثّق بريدك عبر جوجل قبل إنشاء متجرك', 'EMAIL_UNVERIFIED');
+      }
+    }
+
     const name = clean(body.name, 60);
     if (name.length < 2) bad('اسم المتجر مطلوب');
 
     const check = await checkSlug(body.slug || name);
     if (!check.ok) bad(check.reason);
 
-    const whatsapp = normalizePhone(body.whatsapp || merchant.phone);
+    // الدولة قبل الرقم: هي ما يجعل `790123456` أردنياً لا يمنياً
+    const country = String(body.country || '').toUpperCase() || DEFAULT_COUNTRY;
+    if (!COUNTRIES[country]) bad('دولة غير مدعومة');
+
+    const whatsapp = normalizePhone(body.whatsapp || merchant.phone, country);
     if (!validPhone(whatsapp)) bad('رقم واتساب المتجر غير صحيح');
 
     /**
@@ -143,17 +229,18 @@ export default async function register(r) {
                     LIMIT 1`).get(merchant.id))?.plan ?? 'basic';
 
     const storeId = Number((await db.prepare(`
-      INSERT INTO stores (merchant_id, slug, name, sector, tagline, city, whatsapp, color, color_deep, plan, created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      INSERT INTO stores (merchant_id, slug, name, sector, tagline, city, whatsapp, color, color_deep, plan, country, created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(
         merchant.id, check.slug, name,
-        clean(body.sector, 30) || 'other',
+        isSector(body.sector) ? body.sector : DEFAULT_SECTOR,
         clean(body.tagline, 120),
         clean(body.city, 40),
         whatsapp,
         /^#[0-9A-Fa-f]{6}$/.test(body.color ?? '') ? body.color : '#9E2226',
         /^#[0-9A-Fa-f]{6}$/.test(body.colorDeep ?? '') ? body.colorDeep : '#6E1519',
         inherited,
+        country,
         now(),
       )).lastInsertRowid);
 

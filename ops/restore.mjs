@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { spawn } from 'node:child_process';
-import { db } from '../src/db.js';
-import { config } from '../src/config.js';
+import { db } from '../server/db.js';
+import { config } from '../server/config.js';
 
 const args = process.argv.slice(2);
 const dir = config.paths.backups;

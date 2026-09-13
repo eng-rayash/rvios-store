@@ -1,7 +1,7 @@
 // اختبار المتاجر المتعددة (باقة برو)
 import fs from 'node:fs';
 import { finish } from './finish.mjs';
-const B = 'http://localhost:3000';
+import { BASE as B } from './base.mjs';
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.log('  ✘', m)); };
 
@@ -40,6 +40,16 @@ ok(me0.data.slots.free === 0, 'لا خانات شاغرة');
 const denied = await j('POST', '/api/stores', { name: 'متجر ثانٍ', slug: 'second-shop' }, SID);
 ok(denied.data?.code === 'NO_STORE_SLOT', 'رُفض المتجر الثاني بلا خانة');
 
+console.log('\n── قالب الواجهة قبل برو ──');
+const store0 = await j('GET', '/api/me/store', null, SID);
+ok(store0.data.layouts?.length === 2, `الخادم يُعلن قالبين (${store0.data.layouts?.length})`);
+ok(store0.data.store.layout === 'signature', 'القالب الافتراضي «التوقيع»');
+
+const layDenied = await j('PATCH', '/api/me/store', { layout: 'atelier' }, SID);
+ok(layDenied.data?.code === 'PLAN_LIMIT', 'رُفض القالب الثاني على غير برو');
+ok((await j('PATCH', '/api/me/store', { layout: 'signature' }, SID)).status === 200,
+  '«التوقيع» مسموح للجميع');
+
 console.log('\n── الخانة حكر على برو ──');
 await j('PATCH', '/api/admin/settings', { 'price.extra_store': 900, 'price.pro': 8000,
   'pay.kuraimi': 'حوّل إلى الكريمي ١٢٣٤ واكتب المرجع.' }, ADMIN);
@@ -50,6 +60,23 @@ console.log('\n── ترقية لبرو ثم شراء خانة ──');
 const pro = await j('POST', '/api/me/billing/invoices', { kind: 'subscription', plan: 'pro', months: 1 }, SID);
 await j('POST', `/api/me/billing/invoices/${pro.data.invoice.id}/proof`, { method: 'kuraimi', proof: receipt }, SID);
 ok((await j('GET', '/api/me/billing', null, SID)).data.subscription.plan === 'pro', 'فُعّلت برو');
+
+console.log('\n── القالب بعد برو ──');
+const layOn = await j('PATCH', '/api/me/store', { layout: 'atelier' }, SID);
+ok(layOn.status === 200 && layOn.data.store.layout === 'atelier', 'برو يُبدّل القالب');
+ok((await j('PATCH', '/api/me/store', { layout: 'nope' }, SID)).status === 400, 'رُفض قالب غير معروف');
+ok((await j('GET', '/api/shop/yazan')).data.store?.layout === 'atelier',
+  'واجهة المتجر العامة تحمل القالب');
+
+// §٥.٥ إخفاء لا حذف — الهبوط يردّ الواجهة ويُبقي الاختيار
+const mineId = (await j('GET', '/api/auth/me', null, SID)).data.stores[0].id;
+await j('PATCH', `/api/admin/stores/${mineId}`, { plan: 'plus' }, ADMIN);
+const dropped = (await j('GET', '/api/me/store', null, SID)).data.store;
+ok(dropped.layout === 'signature', 'الهبوط يعيد الواجهة إلى «التوقيع»');
+ok(dropped.savedLayout === 'atelier', '★ الاختيار يبقى محفوظاً في القاعدة');
+await j('PATCH', `/api/admin/stores/${mineId}`, { plan: 'pro' }, ADMIN);
+ok((await j('GET', '/api/me/store', null, SID)).data.store.layout === 'atelier',
+  'الترقية تسترجعه بلا إعادة ضبط');
 
 const slot = await j('POST', '/api/me/billing/invoices', { kind: 'extra_store' }, SID);
 ok(slot.status === 201, `أُنشئت فاتورة الخانة (${slot.data.invoice?.ref})`);

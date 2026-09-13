@@ -7,9 +7,9 @@
 //  ٢) هل القالب موجود ومعتمد باللغة المطلوبة؟
 //  ٣) ما نسبة وصول الرسائل التي أرسلناها فعلاً؟
 // ═══════════════════════════════════════════════════════════
-import { config } from '../src/config.js';
-import { checkWhatsApp } from '../src/notify.js';
-import { db } from '../src/db.js';
+import { config } from '../server/config.js';
+import { checkWhatsApp } from '../server/notify.js';
+import { db } from '../server/db.js';
 
 const line = (k, v) => console.log(`   ${k.padEnd(22, '·')} ${v}`);
 

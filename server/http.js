@@ -109,13 +109,24 @@ export const SECURITY_HEADERS = {
   'x-frame-options': 'SAMEORIGIN',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'permissions-policy': 'geolocation=(), microphone=(), camera=(), payment=()',
+  /**
+   * نطاقات جوجل مسموحة لتسجيل الدخول وحده (Google Identity
+   * Services): السكربت من `accounts.google.com`، والزر نفسه
+   * إطارٌ منها، والاتصال يعود إليها. ثلاثة توجيهات لا واحد
+   * لأن كلاً منها يحكم قناة مختلفة — ونسيان `frame-src` يترك
+   * زراً يُرسم ولا يفتح شيئاً حين يُضغط.
+   *
+   * ولا نضيف `'unsafe-inline'` لـ script-src: ثمن راحةٍ صغيرة
+   * هو فتح الباب لأخطر ما تحمينا منه هذه الترويسة.
+   */
   'content-security-policy': [
     "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "script-src 'self' https://accounts.google.com/gsi/client",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob:",
-    "connect-src 'self'",
+    "img-src 'self' data: blob: https://lh3.googleusercontent.com",
+    "connect-src 'self' https://accounts.google.com",
+    "frame-src https://accounts.google.com",
     "form-action 'self'",
     "frame-ancestors 'self'",
     "base-uri 'self'",

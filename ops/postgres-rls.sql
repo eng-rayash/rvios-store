@@ -26,7 +26,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO rvios_app;
 
 -- ── ٢. سياسة العزل على كل جدول تابع ──────────────────────
--- تقابل TENANT_TABLES في src/tenancy.js حرفاً بحرف.
+-- تقابل TENANT_TABLES في server/tenancy.js حرفاً بحرف.
 DO $$
 DECLARE
   t text;

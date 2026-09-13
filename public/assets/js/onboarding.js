@@ -3,25 +3,16 @@
 //  الهدف: أقصر مسافة بين «لا شيء» و«رابط قابل للمشاركة».
 // ═══════════════════════════════════════════════════════════
 import { $, $$, api, toast, withBusy, escapeHtml, applyTheme, scopeTheme, derivePalette } from './app.js';
+import { COUNTRIES, DEFAULT_COUNTRY } from './countries.js';
+import { PICKABLE, DEFAULT_SECTOR } from './sectors.js';
 
 /** ‏?new=1 يعني «أضف متجراً» لتاجر مسجّل، لا تسجيلاً جديداً */
 const ADDING = new URLSearchParams(location.search).get('new') === '1';
 
-const STEPS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7'];
+const STEPS = ['s1', 's2', 'sp', 's3', 's4', 's5', 's6', 's7'];
 let step = 0;
-const data = { phone: '', name: '', slug: '', sector: '', city: '', tagline: '', logo: '', color: '#9E2226', colorDeep: '#6E1519', product: {} };
+const data = { phone: '', country: DEFAULT_COUNTRY, name: '', slug: '', sector: '', city: '', tagline: '', logo: '', color: '#9E2226', colorDeep: '#6E1519', product: {} };
 
-const SECTORS = [
-  { id: 'perfumes',   name: 'عطور وبخور',  icon: 'M9 2h6v3H9zM7 5h10l1 15H6z' },
-  { id: 'fashion',    name: 'أزياء وملابس', icon: 'M12 3 8 5 3 8l3 4 2-1v8h8v-8l2 1 3-4-5-3-4-2z' },
-  { id: 'beauty',     name: 'تجميل وعناية', icon: 'M12 2a5 5 0 0 1 5 5c0 3-5 13-5 13S7 10 7 7a5 5 0 0 1 5-5z' },
-  { id: 'food',       name: 'أطعمة وحلويات', icon: 'M4 4h16v6a8 8 0 0 1-16 0zM4 20h16' },
-  { id: 'electronics',name: 'إلكترونيات',  icon: 'M4 5h16v11H4zM9 20h6M12 16v4' },
-  { id: 'home',       name: 'مستلزمات منزل', icon: 'm3 11 9-8 9 8M6 10v10h12V10' },
-  { id: 'accessories',name: 'إكسسوارات',   icon: 'M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM8 12l-3 9 7-4 7 4-3-9' },
-  { id: 'kids',       name: 'أطفال',        icon: 'M12 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM6 21v-4a6 6 0 0 1 12 0v4' },
-  { id: 'other',      name: 'أخرى',         icon: 'M4 6h16M4 12h16M4 18h16' },
-];
 
 const COLORS = [
   ['#9E2226', '#6E1519'], ['#2F5D50', '#1E3E35'], ['#1F4E79', '#143451'],
@@ -39,7 +30,8 @@ function goto(id) {
 }
 
 function paintBar() {
-  $('#bar').innerHTML = STEPS.slice(0, 6).map((_, i) =>
+  // آخر خطوة شاشةُ تهنئة لا خطوة عمل، فلا تُعدّ في الشريط
+  $('#bar').innerHTML = STEPS.slice(0, STEPS.length - 1).map((_, i) =>
     `<i class="${i <= step ? 'on' : ''}"></i>`).join('');
 }
 
@@ -59,12 +51,25 @@ function preview() {
 }
 
 // ═══ ١. الجوال ═══════════════════════════════════════════
+/**
+ * منتقي الدولة — كان `+967` مكتوباً في HTML، فلم يكن لتاجر من
+ * خارج اليمن أي طريق للتسجيل أصلاً. واختياره يُحفظ مع المتجر
+ * لاحقاً فتتبعه العملة وصيغة رقم واتساب معاً.
+ */
+const countryPick = $('#country');
+countryPick.innerHTML = Object.values(COUNTRIES)
+  .map((c) => `<option value="${c.code}">+${c.dial}</option>`).join('');
+countryPick.value = DEFAULT_COUNTRY;
+data.country = DEFAULT_COUNTRY;
+countryPick.addEventListener('change', () => { data.country = countryPick.value; });
+
 $('#sendCode').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
   const phone = $('#phone').value.trim();
   $('#phoneErr').hidden = true;
-  const res = await api.post('/api/auth/request-code', { phone });
+  const res = await api.post('/api/auth/request-code', { phone, country: countryPick.value });
   data.phone = res.phone;
-  $('#phoneEcho').textContent = '+967 ' + res.phone;
+  // الخادم يعيد الرقم دولياً موحّداً — نعرضه كما هو
+  $('#phoneEcho').textContent = '+' + res.phone;
   if (res.devCode) {
     $('#devHint').hidden = false;
     $('#devHint').textContent = `وضع التطوير — الرمز: ${res.devCode}`;
@@ -108,7 +113,7 @@ $('#verify').addEventListener('click', (e) => withBusy(e.currentTarget, async ()
     setTimeout(() => { location.href = '/dashboard'; }, 900);
     return;
   }
-  goto('s3');
+  await enterProfile();
 }).catch((err) => {
   $('#otpErr').hidden = false;
   $('#otpErr').textContent = err.message;
@@ -116,7 +121,134 @@ $('#verify').addEventListener('click', (e) => withBusy(e.currentTarget, async ()
   otpInputs[0].focus();
 }));
 
-// ═══ ٣. الاسم والرابط — فحص فوري (§٣.٢) ══════════════════
+// ═══ ٣. بيانات التاجر والتحقق ════════════════════════════
+//  الجوال يُثبت أن الشريحة بيده، والبريد هوية ثانية لا تُشترى
+//  من بسطة. الاثنان معاً يجعلان انتحال تاجرٍ مكلفاً بما يكفي.
+//
+//  والمتجر يفتح فور اكتمال البيانات — لا ينتظر بشراً. الإدارة
+//  تراجع بعدها وتمنح شارة «موثَّق». حاجزٌ بشري قبل أول بيع
+//  يقتل التسجيل، والبيانات المطلوبة سلفاً تكفي لملاحقة
+//  المخالف حين يظهر.
+
+let GOOGLE = { enabled: false, clientId: '' };
+let emailVerified = false;
+
+/** يدخل خطوة البيانات ويملأها بما نعرفه سلفاً */
+async function enterProfile() {
+  // تاجر عاد ليضيف متجراً ثانياً عرَّف نفسه من قبل — تخطّي
+  if (ADDING) return goto('s3');
+
+  try {
+    const d = await api.get('/api/me/profile');
+    GOOGLE = d.google;
+    fillBizTypes(d.businessTypes);
+    paintProfile(d.profile);
+    if (GOOGLE.enabled) mountGoogle();
+  } catch { /* تعذّر الجلب: الحقول تبقى فارغة والتحقق عند الإرسال */ }
+
+  goto('sp');
+}
+
+function fillBizTypes(types) {
+  $('#pBiz').innerHTML = '<option value="">اختر…</option>'
+    + (types ?? []).map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`).join('');
+}
+
+function paintProfile(p) {
+  if (!p) return;
+  $('#pFullName').value = p.fullName || '';
+  $('#pCity').value     = p.city || '';
+  $('#pAddress').value  = p.address || '';
+  $('#pNid').value      = p.nationalId || '';
+  if (p.businessType) $('#pBiz').value = p.businessType;
+
+  emailVerified = p.emailVerified;
+  if (p.emailVerified) showGoogleDone(p.email);
+}
+
+function showGoogleDone(email) {
+  $('#gBox').hidden = false;
+  $('#gBtn').hidden = true;
+  $('#gDone').hidden = false;
+  $('#gMail').textContent = email;
+}
+
+/**
+ * زر جوجل يُحمَّل عند الحاجة فقط.
+ *
+ * سكربت جوجل ثقيل ويتصل بخوادمها، وتحميله في كل زيارة لصفحة
+ * الإعداد يُبطئ خطوةً لا تحتاجه — ويُسرّب زيارة كل من فتح
+ * الصفحة إلى جوجل ولو لم يصل إلى هذه الخطوة أصلاً.
+ */
+function mountGoogle() {
+  $('#gBox').hidden = false;
+  if (window.google?.accounts?.id) return renderGoogle();
+
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.async = true;
+  s.onload = renderGoogle;
+  // فشل تحميل السكربت لا يوقف الإعداد: البيانات وحدها تكفي
+  // لفتح المتجر، والبريد يبقى قابلاً للتوثيق من اللوحة لاحقاً
+  s.onerror = () => { $('#gBox').hidden = true; };
+  document.head.appendChild(s);
+}
+
+function renderGoogle() {
+  window.google.accounts.id.initialize({
+    client_id: GOOGLE.clientId,
+    callback: async ({ credential }) => {
+      try {
+        const r = await api.post('/api/auth/google', { credential });
+        emailVerified = true;
+        showGoogleDone(r.profile.email);
+        // جوجل تعرف اسمه — لا نجعله يكتبه مرة أخرى
+        if (r.profile.fullName && !$('#pFullName').value) {
+          $('#pFullName').value = r.profile.fullName;
+        }
+        toast('وُثّق بريدك');
+      } catch (err) { toast(err.message, 'bad'); }
+    },
+  });
+  window.google.accounts.id.renderButton($('#gBtn'), {
+    theme: 'outline', size: 'large', text: 'continue_with',
+    shape: 'pill', locale: 'ar', width: 240,
+  });
+}
+
+$('#toName').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+  $('#pErr').hidden = true;
+
+  const body = {
+    fullName: $('#pFullName').value,
+    city: $('#pCity').value,
+    address: $('#pAddress').value,
+    nationalId: $('#pNid').value,
+    businessType: $('#pBiz').value,
+  };
+
+  // التحقق في الخادم هو الحكم؛ وهذا الفحص يوفّر رحلة شبكة
+  // ويضع الخطأ تحت الحقل بدل رسالة عامة
+  if (body.fullName.trim().split(/\s+/).filter(Boolean).length < 2) {
+    throw new Error('اكتب اسمك الثنائي على الأقل');
+  }
+  if (body.city.trim().length < 2) throw new Error('المدينة مطلوبة');
+  if (!body.businessType) throw new Error('اختر نوع نشاطك');
+  if (GOOGLE.enabled && !emailVerified) throw new Error('وثّق بريدك عبر جوجل للمتابعة');
+
+  await api.patch('/api/me/profile', body);
+
+  // مدينة التاجر تُرشَّح لمدينة المتجر: هما غالباً واحدة،
+  // وسؤاله مرتين عن المدينة نفسها يبدو كأننا لم ننصت
+  if (!data.city) { data.city = body.city.trim(); $('#city').value = data.city; }
+
+  goto('s3');
+}).catch((err) => {
+  $('#pErr').hidden = false;
+  $('#pErr').textContent = err.message;
+}));
+
+// ═══ ٤. الاسم والرابط — فحص فوري (§٣.٢) ══════════════════
 let slugTimer, slugEdited = false;
 
 $('#name').addEventListener('input', (e) => {
@@ -182,7 +314,7 @@ function checkSlug() {
 $('#toSector').addEventListener('click', () => goto('s4'));
 
 // ═══ ٤. النشاط ═══════════════════════════════════════════
-$('#sectors').innerHTML = SECTORS.map((s) => `
+$('#sectors').innerHTML = PICKABLE.map((s) => `
   <button class="pick" data-sector="${s.id}" type="button">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="${s.icon}"/></svg>
     <b>${s.name}</b>
@@ -274,13 +406,16 @@ async function createStore(withProduct) {
   const payload = {
     name: data.name.trim(),
     slug: data.slug,
-    sector: data.sector || 'other',
+    sector: data.sector || DEFAULT_SECTOR,
     city: data.city.trim(),
     tagline: data.tagline.trim(),
     logo: data.logo,
     color: data.color,
     colorDeep: data.colorDeep,
     whatsapp: data.phone,
+    // الدولة تتبع المتجر لا التاجر: عملة المتجر وصيغة أرقامه
+    // تُشتقّان منها، وتاجر واحد قد يملك متجرين في بلدين
+    country: data.country,
   };
 
   if (withProduct && $('#pName').value.trim()) {
@@ -333,6 +468,13 @@ $('#copyUrl').addEventListener('click', async (e) => {
     }
 
     if (me.hasStore) { location.href = '/dashboard'; return; }
+
+    // تاجر مسجّل بلا متجر: يستأنف من حيث توقّف. مَن أكمل
+    // بياناته لا يُعاد إليها، ومَن لم يكملها لا يتخطّاها
+    GOOGLE = me.google ?? GOOGLE;
+    const needsProfile = !me.profile?.complete
+      || (GOOGLE.enabled && !me.profile?.emailVerified);
+    if (needsProfile) return enterProfile();
     goto('s3');
   } catch { /* زائر جديد */ }
 })();

@@ -61,6 +61,14 @@
       <button data-v="stores">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16l-1 5H5z"/><path d="M5 9v11h14V9"/></svg>المتاجر
       </button>
+      <button data-v="merchants">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg>التجار
+        <span class="pill" id="kycPill" hidden>0</span>
+      </button>
+      <button data-v="subs">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>الاشتراكات
+        <span class="pill" id="subPill" hidden>0</span>
+      </button>
       <small>المراجعة</small>
       <button data-v="payments">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>مراجعة المدفوعات
@@ -107,6 +115,57 @@
             <table>
               <thead><tr><th>المتجر</th><th>التاجر</th><th>الباقة</th><th>منتجات</th><th>طلبات</th><th>الحالة</th><th></th></tr></thead>
               <tbody id="storeRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- التجار: شخص واحد ولو ملك خمسة متاجر -->
+      <section class="view" id="v-merchants">
+        <div class="card">
+          <div class="chead">
+            <h2>التجار</h2>
+            <input type="search" id="merchQ" placeholder="ابحث بالاسم أو الجوال أو البريد" style="max-width:320px">
+          </div>
+          <p class="hint">
+            جدول المتاجر يعرض صفاً لكل متجر، فتاجر بثلاثة متاجر يظهر ثلاث مرات.
+            هذه الشاشة تنظر من زاوية التاجر — وهو مَن تحاسبه لا متجره.
+          </p>
+          <div class="tabs" id="kycTabs">
+            <button class="tab on" data-k="">الكل</button>
+            <button class="tab" data-k="pending">بانتظار المراجعة</button>
+            <button class="tab" data-k="approved">موثَّقون</button>
+            <button class="tab" data-k="rejected">مرفوضون</button>
+            <button class="tab" data-k="none">بلا بيانات</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>التاجر</th><th>التواصل</th><th>النشاط</th><th>متاجر</th><th>التحقق</th><th></th></tr></thead>
+              <tbody id="merchRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- الاشتراكات -->
+      <section class="view" id="v-subs">
+        <div class="card">
+          <div class="chead"><h2>اشتراكات المتاجر</h2><span class="badge b-done" id="subSum">—</span></div>
+          <p class="hint">
+            «ينتهي قريباً» هو ما تفتح عليه صباحاً: اتصالٌ قبل الانتهاء
+            أرخص من محاولة استرجاع تاجر بعده.
+          </p>
+          <div class="tabs" id="subTabs">
+            <button class="tab on" data-s="">الكل</button>
+            <button class="tab" data-s="soon">ينتهي خلال أسبوع</button>
+            <button class="tab" data-s="paid">المدفوعة</button>
+            <button class="tab" data-s="grace">في المهلة</button>
+            <button class="tab" data-s="expired">منتهية</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>المتجر</th><th>التاجر</th><th>الباقة</th><th>الحالة</th><th>ينتهي</th><th>مدفوع</th><th></th></tr></thead>
+              <tbody id="subRows"></tbody>
             </table>
           </div>
         </div>
@@ -189,6 +248,16 @@
       </section>
     </div>
   </div>
+</div>
+
+<!-- ملفّ متجر واحد: كل ما يلزم للحكم عليه في شاشة واحدة -->
+<div class="dim" id="dim" hidden></div>
+<div class="sheet wide" id="detail" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="dhead">
+    <h2 id="dTitle">…</h2>
+    <button class="btn btn-line btn-sm" data-close>إغلاق</button>
+  </div>
+  <div id="dBody"></div>
 </div>
 
 <script type="module" src="/assets/js/admin.js"></script>
