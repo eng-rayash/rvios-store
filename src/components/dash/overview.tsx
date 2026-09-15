@@ -74,7 +74,7 @@ export function OverviewScreen() {
       <div className="grid items-start gap-base lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         <Plaque as="section" aria-labelledby="recent-h" className="overflow-hidden">
           <header className="flex items-center gap-snug border-b border-line px-5 py-3.5">
-            <h2 id="recent-h" className="flex-1 text-md font-bold">أحدث الطلبات</h2>
+            <h2 id="recent-h" className="font-heading flex-1 text-md font-bold">أحدث الطلبات</h2>
             <Link
               href="/dashboard/orders"
               className="flex items-center gap-1 text-sm font-bold text-shop-text hover:underline"
@@ -112,7 +112,7 @@ export function OverviewScreen() {
       </div>
 
       <Plaque as="section" aria-labelledby="chart-h" className="px-5 pt-4 pb-5">
-        <h2 id="chart-h" className="mb-base text-md font-bold">الزيارات والطلبات — آخر سبعة أيام</h2>
+        <h2 id="chart-h" className="font-heading mb-base text-md font-bold">الزيارات والطلبات — آخر سبعة أيام</h2>
         <VisitsChart rows={chart} />
       </Plaque>
     </div>

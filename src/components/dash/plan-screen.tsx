@@ -190,7 +190,7 @@ export function PlanScreen() {
 
       {/* ── الباقة الحالية ── */}
       <Plaque as="section" aria-labelledby="cur-h" crest className="px-5 py-4">
-        <h2 id="cur-h" className="text-md font-bold">باقتك الحالية</h2>
+        <h2 id="cur-h" className="font-heading text-md font-bold">باقتك الحالية</h2>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-base gap-y-1">
           <p className="text-stat leading-tight font-semibold">{plans.current.name}</p>
           <p className="text-sm text-soft">{plans.capacity.label}</p>
@@ -228,7 +228,7 @@ export function PlanScreen() {
       {open && (
         <Plaque as="section" aria-labelledby="inv-h" rail className="mt-4 px-5 pt-5 pb-4">
           <div className="flex flex-wrap items-baseline gap-x-base gap-y-1">
-            <h2 id="inv-h" className="text-md font-bold">فاتورة بانتظار التحويل</h2>
+            <h2 id="inv-h" className="font-heading text-md font-bold">فاتورة بانتظار التحويل</h2>
             <Badge tone={INVOICE_STATUS[open.status].tone}>{INVOICE_STATUS[open.status].label}</Badge>
             <p className="ms-auto text-stat leading-tight font-semibold tabular">
               {ar(open.amount)} <span className="text-xs font-normal text-soft">{open.currency}</span>
@@ -268,7 +268,7 @@ export function PlanScreen() {
       {/* ── الباقات ── */}
       <section aria-labelledby="plans-h" className="space-y-snug">
         <div className="flex flex-wrap items-center gap-snug">
-          <h2 id="plans-h" className="flex-1 text-md font-bold">الباقات</h2>
+          <h2 id="plans-h" className="font-heading flex-1 text-md font-bold">الباقات</h2>
           <div role="group" aria-label="مدّة الاشتراك" className="flex gap-2">
             {[{ m: 1, label: 'شهري' }, { m: 12, label: 'سنوي' }].map((o) => (
               <button
@@ -298,7 +298,7 @@ export function PlanScreen() {
             return (
               <Plaque key={p.id} as="article" crest={on} className={cn('flex flex-col px-5 py-4', on && 'lg:-my-1')}>
                 <div className="flex items-baseline gap-snug">
-                  <h3 className="text-lg font-bold">{p.name}</h3>
+                  <h3 className="font-heading text-lg font-bold">{p.name}</h3>
                   {on && <Badge tone="brass" dot={false}>باقتك</Badge>}
                 </div>
                 <p className="mt-0.5 text-xs text-soft">{p.desc}</p>
@@ -342,7 +342,7 @@ export function PlanScreen() {
       {/* ── خدمات إضافية ── */}
       <Plaque as="section" aria-labelledby="addons-h" className="overflow-hidden">
         <header className="border-b border-line px-5 py-3.5">
-          <h2 id="addons-h" className="text-md font-bold">خدمات إضافية</h2>
+          <h2 id="addons-h" className="font-heading text-md font-bold">خدمات إضافية</h2>
           <p className="mt-0.5 text-xs text-soft">خارج الاشتراك — تُطلب مرّةً ونتواصل معك.</p>
         </header>
         <ul className="divide-y divide-line">
@@ -362,7 +362,7 @@ export function PlanScreen() {
       {/* ── سجل الفواتير ── */}
       <Plaque as="section" aria-labelledby="hist-h" className="overflow-hidden">
         <header className="border-b border-line px-5 py-3.5">
-          <h2 id="hist-h" className="text-md font-bold">سجل الفواتير</h2>
+          <h2 id="hist-h" className="font-heading text-md font-bold">سجل الفواتير</h2>
         </header>
         {billing.invoices.length ? (
           <ul className="divide-y divide-line">
@@ -414,7 +414,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
         {ar(n)}
       </span>
       <div>
-        <h3 className="mb-1.5 text-sm font-bold">{title}</h3>
+        <h3 className="font-heading mb-1.5 text-sm font-bold">{title}</h3>
         {children}
       </div>
     </li>

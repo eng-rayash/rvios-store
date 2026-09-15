@@ -309,11 +309,8 @@ const server = http.createServer(async (req, res) => {
      * إحداهما بلا الأخرى تعني صفحةً تُخدم مرّتين أو لا تُخدم أصلاً.
      */
     const PAGES = {
-      '/login':      'login.html',
-      '/track':      'track.html',
-      '/onboarding': 'onboarding.html',
-      '/dashboard':  'dashboard.html',
-      '/admin':      'admin.html',
+      '/track': 'track.html',
+      '/admin': 'admin.html',
     };
     const page = PAGES[pathname.replace(/\/$/, '') || '/'];
     if (page && serveFile(req, res, path.join(PUBLIC_DIR, page))) return;

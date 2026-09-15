@@ -72,8 +72,8 @@ export function LiveChips({ shop, currency }: { shop: string; currency: string }
 
   return (
     <div
-      className="pointer-events-none absolute start-0 top-[14%] z-10 grid w-max gap-3
-                 max-sm:hidden"
+      className="pointer-events-none relative z-10 mx-auto mb-5 grid w-full max-w-[19rem] gap-3
+                 sm:absolute sm:start-0 sm:top-[14%] sm:mx-0 sm:mb-0 sm:w-max sm:max-w-none"
       aria-hidden
     >
       <AnimatePresence mode="popLayout">
@@ -94,7 +94,7 @@ export function LiveChips({ shop, currency }: { shop: string; currency: string }
               </span>
               <span className="grid leading-tight">
                 <b className="text-2xs font-extrabold text-ink">{item.title}</b>
-                <i className="text-[9.5px] not-italic text-soft">{item.sub}</i>
+                <i className="text-2xs not-italic text-soft">{item.sub}</i>
               </span>
             </motion.div>
           );

@@ -22,10 +22,20 @@ const LEGACY_PAGES = [
   'logout', 'admin', 'track',
   'robots.txt', 'sitemap.xml', 'manifest.json', 'sw.js',
 ];
-/* رُحّلت إلى Next: login · dashboard · onboarding — وملفّاتها القديمة باقية في
-   public/ حتى تُحدَّث التوكيدات التي تحرسها في test/pages.mjs و
-   test/pwa.mjs. القاعدة: لا يُحذف ملف قبل أن يُحدَّث حارسه، وإلا
-   صار الفشل غامضاً بين «تصميم مكسور» و«اختبار متقادم».
+/* رُحّلت إلى Next وحُذفت ملفّاتها القديمة: login · dashboard · onboarding.
+   سبع ملفات (`{dashboard,login,onboarding}.html` و`{dashboard,onboarding,
+   page-login}.js` و`flow.css`) — آخر نسخة منها في `f5a9793`، ومن أراد
+   أصل تعليقٍ يحيل إليها فهي هناك: `git show f5a9793:public/…`.
+
+   و`dash.css` **لم يُحذف**: `admin.html` ما زالت تحمّله، وهي آخر صفحة لم
+   تُرحَّل. يُحذف يوم تُرحَّل، لا قبله.
+
+   القاعدة التي جرى عليها الحذف: لا يُحذف ملف قبل أن يُحدَّث حارسه في
+   التعديل نفسه — وإلا صار الفشل غامضاً بين «تصميم مكسور» و«اختبار
+   متقادم». حرّاس هذه السبعة كانوا أربعة: `test/pages.mjs` (قائمة
+   الأصول وعنوان اللوحة)، و`test/readiness.mjs` (واجهة الفوترة —
+   أُعيد توجيهها إلى `plan-screen.tsx` لا حُذفت)، و`server/server.js`
+   (جدول PAGES)، و`public/sw.js` (التخزين المسبق).
 
    ★ وكل صفحة تخرج من هذه القائمة تدخل مطابقة `src/proxy.ts` في
    التعديل نفسه — لا قبله ولا بعده. الـproxy يعمل قبل إعادة الكتابة:

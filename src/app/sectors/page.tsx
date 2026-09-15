@@ -52,7 +52,7 @@ export default function SectorsPage() {
                       <SectorPlate sector={s} size={560} pad="7%" />
                     </div>
                     <div className="flex flex-1 flex-col p-6">
-                      <h2 className="mb-2 font-display text-h3 font-bold">{s.name}</h2>
+                      <h2 className="mb-2 font-heading text-h3 font-bold">{s.name}</h2>
                       <p className="mb-4 flex-1 text-sm leading-loose text-soft text-pretty">{s.blurb}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {s.tags.map((t) => (
@@ -69,7 +69,7 @@ export default function SectorsPage() {
 
             <Reveal delay={0.15}>
               <div className="mx-auto mt-14 max-w-2xl rounded-xl border border-line bg-paper p-8 text-center">
-                <h2 className="mb-3 font-display text-h3 font-bold">لا ترى نشاطك في القائمة؟</h2>
+                <h2 className="mb-3 font-heading text-h3 font-bold">لا ترى نشاطك في القائمة؟</h2>
                 <p className="mb-6 text-sm leading-loose text-soft text-pretty">
                   هذه أمثلة لا قوالب. الثيم عام بالكامل ولا يفترض قطاعاً بعينه —
                   أنشئ متجرك واكتب تصنيفاتك كما تريدها تماماً.

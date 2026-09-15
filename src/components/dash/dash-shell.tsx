@@ -353,7 +353,7 @@ function Topbar({ title, store }: { title: string; store: Store | null }) {
 
   return (
     <header className="sticky top-0 z-[var(--z-header)] flex items-center gap-snug border-b border-line bg-cream/90 px-base py-3 backdrop-blur-md sm:px-roomy lg:px-airy">
-      <h1 className="min-w-0 flex-1 truncate text-title leading-tight font-semibold">{title}</h1>
+      <h1 className="font-heading min-w-0 flex-1 truncate text-title leading-tight font-semibold">{title}</h1>
 
       {store && (
         <>

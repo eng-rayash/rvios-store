@@ -86,7 +86,7 @@ row('تحويل WebP على الخادم', srcAll.includes('webp') && srcAll.inc
 // نفحص الاستدعاء الفعلي للمسار لا وجود كلمة في HTML:
 // الترميز قد يوجد بلا منطق يشغّله، وهذا بالضبط ما كان ينقص.
 row('واجهة الفوترة للتاجر',
-  read('public/assets/js/dashboard.js').includes('/api/me/billing/invoices'));
+  read('src/components/dash/plan-screen.tsx').includes('/api/me/billing/invoices'));
 row('واجهة مراجعة المدفوعات',
   read('public/assets/js/admin.js').includes('/api/admin/invoices'));
 row('شاشة ضبط الأسعار',

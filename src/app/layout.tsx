@@ -57,6 +57,48 @@ const markazi = Markazi_Text({
   subsets: ['arabic', 'latin'],
   variable: '--font-markazi',
   display: 'swap',
+  /* ★ بلا تحميل مسبق — لأنه لم يعد يرسم شيئاً بنفسه.
+     كان خطّ النصّ فكان التحميل المسبق واجباً. وبعد أن صارت
+     «ثمانية» تحمل النصّ صار دوره احتياطياً: يلتقط محرفاً ينقص
+     «ثمانية» إن نقص. و`preload` على وجهٍ احتياطي يضع نسختين
+     (عربية ولاتينية) في المسار الحرج تنافسان الوجه الذي يرسم
+     الصفحة فعلاً — وهو أسوأ ما يُفعل بشبكة بطيئة: تأخير المرئي
+     لأجل غير المرئي. و`@font-face` يبقى معرَّفاً، فإن لزم
+     محرفٌ منه جُلب عندها. */
+  preload: false,
+});
+
+/**
+ * «ثمانية» — وجه النصّ العربي الصغير كلّه.
+ *
+ * بدأ دوره عنواناً صغيراً وحده، ثم امتدّ إلى كل نصٍّ صغير:
+ * كان الموقع يوزّع النصّ الصغير بين وجهين عربيين بلا قاعدة
+ * يراها القارئ. الآن «مغفرة» للعناوين الكبيرة و«ثمانية» لما
+ * دونها، و«مركزي» احتياطيّ خلفه لالتقاط ما ينقصه من محارف.
+ *
+ * ★ WOFF2 لا OTF — وهذا شرط الترقية لا تحسينٌ بعدها.
+ * `localFont` يخدم الملف كما هو، فـ`.otf` بوزنيه ٤٨٠ ك.ب. وهو
+ * محتمَل لعنوانٍ يظهر في بطاقة، وغير محتمَل حين يصير وجه **كل**
+ * نصّ في الصفحة على شبكةٍ بُنيت بقيّةُ قرارات هذا المشروع لأجل
+ * بطئها. والتحويل يردّها إلى ١٥٧ ك.ب — نفس المحارف ونفس
+ * التوصيف، بترميز جدولٍ أحدث. والمصادر `.otf` في
+ * `assets-src/_غير-مستخدم/fonts/`، والتحويل بـ
+ * `scripts/font-to-woff2.py` — يُشغَّل على أي وجه جديد **قبل**
+ * تسجيله هنا، لأن `localFont` يخدم الملف كما هو.
+ *
+ * ★ وزنان لا ثلاثة. Medium يحمل النصّ العادي (الطلب ٤٠٠ يقع
+ * عليه إذ لا وزن أخفّ)، وBold تشديده. وBlack محوَّلٌ بجواره في
+ * `public/fonts` وسطرٌ واحد يكفي لضمّه إن لزم عنوانٌ أثقل.
+ */
+const thmanyah = localFont({
+  src: [
+    { path: '../../public/fonts/ThmanyahSerifText-Medium.woff2', weight: '500', style: 'normal' },
+    { path: '../../public/fonts/ThmanyahSerifText-Bold.woff2', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-thmanyah',
+  display: 'swap',
+  adjustFontFallback: false,   // مقاييس Arial لا تصف وجهاً عربياً
+  fallback: ['Georgia', 'serif'],
 });
 
 /**
@@ -126,7 +168,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
          ينزلق المستعرض ببطء إلى أعلى الصفحة الجديدة بدل أن يقفز —
          والتاجر ينتقل بين الطلبات والمنتجات عشرات المرّات يومياً. */
       data-scroll-behavior="smooth"
-      className={`${markazi.variable} ${maghfira.variable} ${yapari.variable}`}
+      className={`${markazi.variable} ${maghfira.variable} ${thmanyah.variable} ${yapari.variable}`}
     >
       <body className="min-h-dvh bg-cream text-ink antialiased">{children}</body>
     </html>

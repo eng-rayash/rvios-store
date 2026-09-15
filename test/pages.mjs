@@ -8,7 +8,10 @@ const ok = (c, m) => { c ? (pass++, console.log('  ✔', m)) : (fail++, console.
 const PAGES = [
   ['/login', 'الدخول', 'تسجيل الدخول'],
   ['/onboarding', 'الإعداد', 'أنشئ متجرك'],
-  ['/dashboard', 'لوحة التاجر', 'لوحة التحكم'],
+  // «لوحة التحكم» كان عنوان الصفحة الواحدة القديمة. لوحة Next
+  // تسع شاشات لكلٍّ عنوانها، و`/dashboard` هي «نظرة عامة» —
+  // فالمفحوص الآن عنوان الشاشة المعروضة لا اسم الملف.
+  ['/dashboard', 'لوحة التاجر', 'نظرة عامة'],
   ['/admin', 'الإدارة', 'إدارة المنصة'],
 ];
 
@@ -40,7 +43,11 @@ const ssr = await (await fetch(B + '/yazan')).text();
 ok(/<title>متجر ذو يزن للعطور/.test(ssr), 'العنوان في HTML');
 ok(/og:title/.test(ssr) && /og:image/.test(ssr), 'وسوم Open Graph');
 ok(/application\/ld\+json/.test(ssr), 'بيانات منظّمة Schema.org');
-ok((ssr.match(/<article>/g) ?? []).length >= 9, 'المنتجات مقروءة قبل تنفيذ JS');
+// `<article>` بلا سمات كان يصحّ على HTML المكتوب بخطّ اليد في
+// `store.html`. بطاقة المنتج في Next تحمل `class`، فالتعبير القديم
+// يعدّ صفراً ويُقرأ «التصيير الخادمي سقط» — وهو قائم بتسعة وسوم.
+// الحدّ الفاصل `[ >]` يمنع أن يبتلع `<articlefoo>` لو وُجد.
+ok((ssr.match(/<article[ >]/g) ?? []).length >= 9, 'المنتجات مقروءة قبل تنفيذ JS');
 
 console.log('\n── الفهرسة ──');
 const sm = await fetch(B + '/sitemap.xml');
@@ -55,12 +62,13 @@ for (const h of ['content-security-policy', 'x-content-type-options', 'x-frame-o
 }
 
 console.log('\n── الأصول ──');
+// ما بقي من الخادم القديم بعد ترحيل اللوحة والدخول والتسجيل.
+// و`dash.css` باقٍ عمداً: `admin.html` ما زالت تحمّله، وهي آخر
+// صفحة لم تُرحَّل — يُحذف يوم تُرحَّل، لا قبله.
 const ASSETS = [
-  '/assets/css/tokens.css', '/assets/css/store.css',
-  '/assets/css/dash.css', '/assets/css/flow.css',
+  '/assets/css/tokens.css', '/assets/css/store.css', '/assets/css/dash.css',
   '/assets/js/app.js', '/assets/js/store-page.js',
-  '/assets/js/dashboard.js', '/assets/js/admin.js', '/assets/js/onboarding.js',
-  '/assets/js/sectors.js',
+  '/assets/js/admin.js', '/assets/js/sectors.js',
   '/assets/img/p1.jpg',
 ];
 for (const a of ASSETS) {

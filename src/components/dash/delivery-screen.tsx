@@ -130,7 +130,7 @@ export function DeliveryScreen() {
         {/* ── المناطق ── */}
         <Plaque as="section" aria-labelledby="zones-h" className="overflow-hidden">
           <header className="flex items-center gap-snug border-b border-line px-5 py-3.5">
-            <h2 id="zones-h" className="flex-1 text-md font-bold">مناطق التوصيل</h2>
+            <h2 id="zones-h" className="font-heading flex-1 text-md font-bold">مناطق التوصيل</h2>
             <Button size="sm" icon={<Plus className="size-3.5" />} onClick={() => { setEditing(null); setFormOpen(true); }}>
               أضف منطقة
             </Button>
@@ -193,7 +193,7 @@ export function DeliveryScreen() {
         {/* ── الرسم العام وطرق الدفع ── */}
         <div className="space-y-base">
           <Plaque as="section" aria-labelledby="fallback-h" className="px-5 py-4">
-            <h2 id="fallback-h" className="mb-snug text-md font-bold">الرسم العام</h2>
+            <h2 id="fallback-h" className="font-heading mb-snug text-md font-bold">الرسم العام</h2>
             <p className="mb-base text-xs leading-loose text-soft">
               {zones.length
                 ? 'يُطبَّق حين لا يختار العميل منطقة، وحين تُحذف المناطق كلها.'
@@ -224,7 +224,7 @@ export function DeliveryScreen() {
           </Plaque>
 
           <Plaque as="section" aria-labelledby="pay-h" className="px-5 py-4">
-            <h2 id="pay-h" className="mb-snug text-md font-bold">طرق الدفع</h2>
+            <h2 id="pay-h" className="font-heading mb-snug text-md font-bold">طرق الدفع</h2>
             <p className="mb-base text-xs leading-loose text-soft">
               المنصة لا تلمس أموال مبيعاتك ولا تضمنها. <b className="text-ink">تأكيد الدفع قرارك وحدك.</b>
             </p>

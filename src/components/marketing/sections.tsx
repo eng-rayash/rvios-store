@@ -17,6 +17,7 @@ import { PlanCard } from './plan-card';
 import { SectorPlate } from './sector-plate';
 import { Marquee } from './marquee';
 import { Faq, type QA } from './faq';
+import { ScrollX } from '@/components/ui/scroll-x';
 
 /* ══════════ متاجر تعمل على المنصة الآن ══════════ */
 /**
@@ -129,7 +130,7 @@ export function Steps() {
               <p className="mb-2 font-display text-xl font-bold text-brass-deep tabular">
                 {['٠١', '٠٢', '٠٣'][i]}
               </p>
-              <h3 className="mb-2.5 font-display text-h3 font-bold">{s.title}</h3>
+              <h3 className="mb-2.5 font-heading text-h3 font-bold">{s.title}</h3>
               <p className="mx-auto max-w-xs text-sm leading-loose text-soft text-pretty">{s.body}</p>
             </Reveal>
           ))}
@@ -324,7 +325,11 @@ export function Comparison({ tone = 'paper' }: { tone?: 'cream' | 'paper' }) {
               تحت إصبع الزائر وينزاح الشريط العلوي معها. وسطر
               `relative` واحد يُعيد صندوق الاحتواء إلى داخل حاوية
               التمرير، فتُقصّ كما يُقصّ الجدول. */}
-          <div className="relative overflow-x-auto rounded-xl border border-line bg-cream">
+          <ScrollX
+            label="جدول مقارنة الباقات"
+            hint="مرّر الجدول أفقياً لرؤية الباقات الثلاث"
+            className="relative rounded-xl border border-line bg-cream"
+          >
             <table className="w-full min-w-[560px] border-collapse text-sm">
               <caption className="sr-only">مقارنة ميزات الباقات الثلاث</caption>
               <thead>
@@ -369,16 +374,8 @@ export function Comparison({ tone = 'paper' }: { tone?: 'cream' | 'paper' }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         </Reveal>
-
-        {/* ★ الجدول أعرض من الهاتف (٥٦٠ بكسل) ويُمرَّر أفقياً — ولا
-            شيء كان يقول ذلك. حافّة مقصوصة بلا إشارة تُقرأ نهايةَ
-            المحتوى لا بدايةَ تمرير، فيظنّ الزائر أن «برو» غير
-            معروضة. والسطر يظهر حيث يقع النقص وحده. */}
-        <p className="mt-3 text-center text-2xs text-soft sm:hidden">
-            مرّر الجدول أفقياً لرؤية الباقات الثلاث
-        </p>
 
         <Reveal delay={0.15}>
           <p className="mt-6 text-center text-sm text-soft">
@@ -435,7 +432,7 @@ export function Addons({ tone = 'cream' }: { tone?: 'cream' | 'paper' }) {
                     {a.kind}
                   </span>
                 </div>
-                <h3 className="mb-2 font-display text-h3 font-bold">{a.name}</h3>
+                <h3 className="mb-2 font-heading text-h3 font-bold">{a.name}</h3>
                 <p className="mb-6 flex-1 text-sm leading-loose text-soft text-pretty">{a.desc}</p>
                 <Link
                   href="/contact"

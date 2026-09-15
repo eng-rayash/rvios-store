@@ -26,7 +26,7 @@ export function CapacityMeter({ planName, cap }: { planName: string; cap: Capaci
 
   return (
     <Plaque className="flex flex-col px-5 py-4.5">
-      <h2 className="text-sm font-bold">سعة باقة {planName}</h2>
+      <h2 className="font-heading text-sm font-bold">سعة باقة {planName}</h2>
       <p className="mt-1.5 text-stat leading-tight font-semibold tabular">{cap.label}</p>
 
       <div

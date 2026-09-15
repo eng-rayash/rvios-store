@@ -49,7 +49,7 @@ export default function ContactPage() {
               <Reveal delay={0.1} className="grid content-start gap-4">
                 {SERVICES.map((s) => (
                   <article key={s.title} className="rounded-xl border border-line bg-paper p-6">
-                    <h2 className="mb-2 font-display text-h3 font-bold">{s.title}</h2>
+                    <h2 className="mb-2 font-heading text-h3 font-bold">{s.title}</h2>
                     <p className="text-sm leading-loose text-soft text-pretty">{s.body}</p>
                   </article>
                 ))}

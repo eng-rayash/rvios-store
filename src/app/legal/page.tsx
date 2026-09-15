@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Header } from '@/components/site/header';
 import { Footer } from '@/components/site/footer';
 import { Reveal } from '@/components/ui/reveal';
+import { ScrollX } from '@/components/ui/scroll-x';
 
 export const metadata: Metadata = {
   title: 'الشروط والخصوصية',
@@ -138,12 +139,16 @@ export default function LegalPage() {
               <p className="text-xs font-bold text-brass-deep">آخر تحديث: أغسطس ٢٠٢٦</p>
 
               <H3>١. ما الذي نجمعه</H3>
-              <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-paper">
+              <ScrollX
+                label="جدول البيانات التي نجمعها والغرض منها"
+                hint="مرّر الجدول أفقياً لرؤية عمود الغرض"
+                className="mt-2 rounded-xl border border-line bg-paper"
+              >
                 <table className="w-full min-w-[440px] border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-line">
-                      <th className="px-5 py-3.5 text-start text-xs font-extrabold text-soft">البيانات</th>
-                      <th className="px-5 py-3.5 text-start text-xs font-extrabold text-soft">الغرض</th>
+                      <th scope="col" className="px-5 py-3.5 text-start text-xs font-extrabold text-soft">البيانات</th>
+                      <th scope="col" className="px-5 py-3.5 text-start text-xs font-extrabold text-soft">الغرض</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -160,7 +165,7 @@ export default function LegalPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ScrollX>
               <P>
                 لا نستخدم كوكيز إعلانية ولا نضع أدوات تتبّع من طرف ثالث. والكوكي الوحيد الذي
                 نضعه هو كوكي الجلسة اللازم لإبقائك مسجّل الدخول.

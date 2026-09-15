@@ -85,7 +85,7 @@ export function TierStudio() {
                                  text-2xs font-extrabold tracking-widest text-brass-deep">
                   {plan.name}
                 </span>
-                <h3 className="mb-1.5 font-display text-h3 font-bold">{plan.design.name}</h3>
+                <h3 className="mb-1.5 font-heading text-h3 font-bold">{plan.design.name}</h3>
                 <p className="text-sm leading-loose text-soft text-pretty">{plan.design.desc}</p>
               </div>
             </motion.article>

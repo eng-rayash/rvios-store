@@ -160,7 +160,7 @@ export function Sheet({
             )}
 
             <div className="flex shrink-0 items-center justify-between gap-base px-roomy pt-base pb-snug">
-              <h2 id={titleId} className="text-lg font-bold">{title}</h2>
+              <h2 id={titleId} className="font-heading text-lg font-bold">{title}</h2>
               <button
                 type="button"
                 onClick={() => closeRef.current()}

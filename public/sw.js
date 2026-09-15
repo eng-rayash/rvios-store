@@ -16,7 +16,6 @@ const SHELL = `${VERSION}-shell`;
 // أصول القشرة: ما تحتاجه الصفحة لترسم نفسها
 const SHELL_ASSETS = [
   '/assets/css/tokens.css',
-  '/assets/css/dash.css',
   '/assets/css/store.css',
   '/assets/css/store-tiers.css',
   '/assets/js/app.js',

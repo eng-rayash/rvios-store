@@ -408,7 +408,7 @@ function Section({ title, aside, children }: { title: string; aside?: React.Reac
   return (
     <Plaque as="section" className="overflow-hidden">
       <header className="flex items-center gap-snug border-b border-line px-5 py-3.5">
-        <h2 className="flex-1 text-md font-bold">{title}</h2>
+        <h2 className="font-heading flex-1 text-md font-bold">{title}</h2>
         {aside}
       </header>
       <div className="px-5 py-4">{children}</div>

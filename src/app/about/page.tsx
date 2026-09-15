@@ -177,7 +177,7 @@ export default function AboutPage() {
               {DECISIONS.map((d, i) => (
                 <Reveal key={d.title} delay={(i % 2) * 0.08}>
                   <article className="h-full rounded-xl border border-line bg-paper p-6 transition-shadow hover:shadow-soft">
-                    <h3 className="mb-3 font-display text-h3 font-bold">{d.title}</h3>
+                    <h3 className="mb-3 font-heading text-h3 font-bold">{d.title}</h3>
                     <p className="text-sm leading-loose text-soft text-pretty">{d.body}</p>
                   </article>
                 </Reveal>
